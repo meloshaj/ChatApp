@@ -1,0 +1,161 @@
+<Window x:Class="ChatClient.Wpf.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Chat App - Login"
+        Height="700"
+        Width="500"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Main Content: scroll when tall (DPI / scaling) so Sign Up stays reachable -->
+        <Border Grid.Row="0" Padding="40">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalAlignment="Stretch">
+                <StackPanel VerticalAlignment="Top">
+                <!-- Logo/Title -->
+                <Grid Height="80" Margin="0,0,0,40">
+                    <Ellipse Fill="{StaticResource Avatar1Gradient}" 
+                             Width="80" 
+                             Height="80" />
+                    <TextBlock Text="💬" 
+                               FontSize="40" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center" />
+                </Grid>
+
+                <TextBlock Text="Welcome Back" 
+                           FontSize="28" 
+                           FontWeight="Bold" 
+                           Foreground="{StaticResource ForegroundBrush}" 
+                           HorizontalAlignment="Center" 
+                           Margin="0,0,0,8" />
+                
+                <TextBlock Text="Sign in to continue" 
+                           FontSize="14" 
+                           Foreground="{StaticResource MutedForegroundBrush}" 
+                           HorizontalAlignment="Center" 
+                           Margin="0,0,0,40" />
+
+                <!-- Server Connection -->
+                <TextBlock Text="Server Address" 
+                           FontSize="12" 
+                           FontWeight="SemiBold" 
+                           Foreground="{StaticResource ForegroundBrush}" 
+                           Margin="0,0,0,8" />
+                
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="100" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="HostTextBox" 
+                             Grid.Column="0"
+                             Height="44" 
+                             Padding="16,12" 
+                             Text="127.0.0.1"
+                             Background="{StaticResource MutedBrush}"
+                             Foreground="{StaticResource ForegroundBrush}"
+                             BorderThickness="1"
+                             BorderBrush="{StaticResource BorderBrush}" />
+                    <TextBox x:Name="PortTextBox" 
+                             Grid.Column="1" 
+                             Margin="8,0,0,0" 
+                             Height="44" 
+                             Padding="16,12" 
+                             Text="13000"
+                             Background="{StaticResource MutedBrush}"
+                             Foreground="{StaticResource ForegroundBrush}"
+                             BorderThickness="1"
+                             BorderBrush="{StaticResource BorderBrush}" />
+                </Grid>
+
+                <!-- Username -->
+                <TextBlock Text="Username" 
+                           FontSize="12" 
+                           FontWeight="SemiBold" 
+                           Foreground="{StaticResource ForegroundBrush}" 
+                           Margin="0,0,0,8" />
+                
+                <TextBox x:Name="UsernameTextBox" 
+                         Height="44" 
+                         Padding="16,12" 
+                         Margin="0,0,0,16"
+                         Background="{StaticResource MutedBrush}"
+                         Foreground="{StaticResource ForegroundBrush}"
+                         BorderThickness="1"
+                         BorderBrush="{StaticResource BorderBrush}" />
+
+                <!-- Password -->
+                <TextBlock Text="Password" 
+                           FontSize="12" 
+                           FontWeight="SemiBold" 
+                           Foreground="{StaticResource ForegroundBrush}" 
+                           Margin="0,0,0,8" />
+                
+                <PasswordBox x:Name="PasswordBox" 
+                             Height="44" 
+                             Padding="16,12" 
+                             Margin="0,0,0,24"
+                             Background="{StaticResource MutedBrush}"
+                             Foreground="{StaticResource ForegroundBrush}"
+                             BorderThickness="1"
+                             BorderBrush="{StaticResource BorderBrush}" />
+
+                <!-- Login Button -->
+                <Button x:Name="LoginButton" 
+                        Style="{StaticResource SendButtonStyle}" 
+                        Content="Sign In" 
+                        Height="48" 
+                        Margin="0,0,0,16" 
+                        Click="LoginButton_Click" />
+
+                <!-- Register Link -->
+                <TextBlock HorizontalAlignment="Center" 
+                           Margin="0,0,0,16"
+                           FontSize="14">
+                    <Run Text="Don't have an account? " 
+                         Foreground="{StaticResource ForegroundBrush}" />
+                    <Hyperlink x:Name="RegisterLink" 
+                               Click="RegisterLink_Click"
+                               Foreground="#FF3B82F6"
+                               TextDecorations="Underline">
+                        <Run Text="Sign Up" FontWeight="Bold" />
+                    </Hyperlink>
+                </TextBlock>
+
+                <!-- Status Message -->
+                <Border x:Name="StatusBorder" 
+                        Background="#FFF3F4F6" 
+                        Padding="12" 
+                        BorderThickness="1"
+                        BorderBrush="#FFE5E7EB"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="StatusTextBlock" 
+                               Text="" 
+                               Foreground="#FF991B1B" 
+                               TextWrapping="Wrap" 
+                               FontSize="12" 
+                               TextAlignment="Center" />
+                </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Footer -->
+        <Border Grid.Row="1" 
+                Background="{StaticResource MutedBrush}" 
+                Padding="20,16">
+            <TextBlock Text="Secure authentication with encrypted passwords" 
+                       FontSize="11" 
+                       Foreground="{StaticResource MutedForegroundBrush}" 
+                       HorizontalAlignment="Center" />
+        </Border>
+    </Grid>
+</Window>
