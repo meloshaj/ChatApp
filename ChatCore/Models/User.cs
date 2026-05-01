@@ -8,6 +8,8 @@ namespace ChatCore.Models
         public string Id { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
+        public string RsaPublicKey { get; set; } = string.Empty;
+        public string RsaPrivateKey { get; set; } = string.Empty;
         public HashSet<string> FriendIds { get; } = new();
         public string? ActiveConversationId { get; set; }
         public UserStatus Status { get; set; } = UserStatus.Offline;

@@ -28,6 +28,8 @@ namespace ChatCore.Persistence
                     id TEXT PRIMARY KEY,
                     username TEXT NOT NULL COLLATE NOCASE UNIQUE,
                     password_hash TEXT NOT NULL,
+                    rsa_public_key TEXT NOT NULL DEFAULT '',
+                    rsa_private_key TEXT NOT NULL DEFAULT '',
                     active_conversation_id TEXT NULL,
                     status INTEGER NOT NULL,
                     last_seen TEXT NOT NULL,
@@ -93,8 +95,34 @@ namespace ChatCore.Persistence
             await using var command = connection.CreateCommand();
             command.CommandText = commandText;
             await command.ExecuteNonQueryAsync();
+
+            await AddColumnIfMissingAsync(connection, "users", "rsa_public_key", "TEXT NOT NULL DEFAULT ''");
+            await AddColumnIfMissingAsync(connection, "users", "rsa_private_key", "TEXT NOT NULL DEFAULT ''");
         }
 
         public SqliteConnection CreateConnection() => new(connectionString);
+
+        private static async Task AddColumnIfMissingAsync(
+            SqliteConnection connection,
+            string tableName,
+            string columnName,
+            string columnDefinition)
+        {
+            await using var checkCommand = connection.CreateCommand();
+            checkCommand.CommandText = $"PRAGMA table_info({tableName});";
+
+            await using var reader = await checkCommand.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            await using var alterCommand = connection.CreateCommand();
+            alterCommand.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+            await alterCommand.ExecuteNonQueryAsync();
+        }
     }
 }

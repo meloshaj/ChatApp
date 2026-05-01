@@ -2,12 +2,14 @@ using System.Security.Cryptography;
 using System.Text;
 using ChatCore.Interfaces;
 using ChatCore.Models;
+using ChatCore.Security;
 
 namespace ChatCore.Services
 {
     public class AuthenticationService
     {
         private readonly IUserRepository userRepository;
+        private readonly RsaService rsaService = new();
         private readonly Dictionary<string, string> activeSessions = new();
         private readonly object sessionLock = new();
 
@@ -40,11 +42,14 @@ namespace ChatCore.Services
                 return (false, null, null, "Username already exists.");
             }
 
+            RsaKeyPair rsaKeys = rsaService.GenerateKeyPair();
             var user = new User
             {
                 Id = Guid.NewGuid().ToString(),
                 Username = username,
                 PasswordHash = HashPassword(password),
+                RsaPublicKey = rsaKeys.PublicKey,
+                RsaPrivateKey = rsaKeys.PrivateKey,
                 Status = UserStatus.Offline
             };
 
@@ -72,6 +77,8 @@ namespace ChatCore.Services
             {
                 return (false, null, null, "Invalid username or password.");
             }
+
+            await EnsureUserHasRsaKeysAsync(user);
 
             var sessionToken = CreateSession(user.Id);
             return (true, user.Id, sessionToken, null);
@@ -121,6 +128,20 @@ namespace ChatCore.Services
         {
             var computedHash = HashPassword(password);
             return computedHash == hash;
+        }
+
+        private async Task EnsureUserHasRsaKeysAsync(User user)
+        {
+            if (!string.IsNullOrWhiteSpace(user.RsaPublicKey) &&
+                !string.IsNullOrWhiteSpace(user.RsaPrivateKey))
+            {
+                return;
+            }
+
+            RsaKeyPair rsaKeys = rsaService.GenerateKeyPair();
+            user.RsaPublicKey = rsaKeys.PublicKey;
+            user.RsaPrivateKey = rsaKeys.PrivateKey;
+            await userRepository.UpdateAsync(user);
         }
     }
 }

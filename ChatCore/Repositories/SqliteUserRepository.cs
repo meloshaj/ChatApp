@@ -25,7 +25,7 @@ namespace ChatCore.Repositories
 
             await using var command = connection.CreateCommand();
             command.CommandText = """
-                SELECT id, username, password_hash, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id
+                SELECT id, username, password_hash, rsa_public_key, rsa_private_key, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id
                 FROM users
                 WHERE id = $id;
                 """;
@@ -51,7 +51,7 @@ namespace ChatCore.Repositories
 
             await using var command = connection.CreateCommand();
             command.CommandText = """
-                SELECT id, username, password_hash, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id
+                SELECT id, username, password_hash, rsa_public_key, rsa_private_key, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id
                 FROM users
                 ORDER BY username;
                 """;
@@ -77,8 +77,8 @@ namespace ChatCore.Repositories
             {
                 command.Transaction = transaction;
                 command.CommandText = """
-                    INSERT INTO users (id, username, password_hash, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id)
-                    VALUES ($id, $username, $passwordHash, $activeConversationId, $status, $lastSeen, $isTyping, $typingInConversationId);
+                    INSERT INTO users (id, username, password_hash, rsa_public_key, rsa_private_key, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id)
+                    VALUES ($id, $username, $passwordHash, $rsaPublicKey, $rsaPrivateKey, $activeConversationId, $status, $lastSeen, $isTyping, $typingInConversationId);
                     """;
                 FillUserParameters(command, entity);
                 await command.ExecuteNonQueryAsync();
@@ -102,6 +102,8 @@ namespace ChatCore.Repositories
                     UPDATE users
                     SET username = $username,
                         password_hash = $passwordHash,
+                        rsa_public_key = $rsaPublicKey,
+                        rsa_private_key = $rsaPrivateKey,
                         active_conversation_id = $activeConversationId,
                         status = $status,
                         last_seen = $lastSeen,
@@ -152,7 +154,7 @@ namespace ChatCore.Repositories
 
             await using var command = connection.CreateCommand();
             command.CommandText = """
-                SELECT id, username, password_hash, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id
+                SELECT id, username, password_hash, rsa_public_key, rsa_private_key, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id
                 FROM users
                 WHERE username = $username COLLATE NOCASE;
                 """;
@@ -196,7 +198,7 @@ namespace ChatCore.Repositories
 
             await using var command = connection.CreateCommand();
             command.CommandText = """
-                SELECT id, username, password_hash, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id
+                SELECT id, username, password_hash, rsa_public_key, rsa_private_key, active_conversation_id, status, last_seen, is_typing, typing_in_conversation_id
                 FROM users
                 WHERE status = $status;
                 """;
@@ -241,6 +243,8 @@ namespace ChatCore.Repositories
             command.Parameters.AddWithValue("$id", entity.Id);
             command.Parameters.AddWithValue("$username", entity.Username);
             command.Parameters.AddWithValue("$passwordHash", entity.PasswordHash);
+            command.Parameters.AddWithValue("$rsaPublicKey", entity.RsaPublicKey);
+            command.Parameters.AddWithValue("$rsaPrivateKey", entity.RsaPrivateKey);
             command.Parameters.AddWithValue("$activeConversationId", (object?)entity.ActiveConversationId ?? DBNull.Value);
             command.Parameters.AddWithValue("$status", (int)entity.Status);
             command.Parameters.AddWithValue("$lastSeen", entity.LastSeen.ToString("O"));
@@ -279,11 +283,13 @@ namespace ChatCore.Repositories
                 Id = reader.GetString(0),
                 Username = reader.GetString(1),
                 PasswordHash = reader.GetString(2),
-                ActiveConversationId = reader.IsDBNull(3) ? null : reader.GetString(3),
-                Status = (UserStatus)reader.GetInt32(4),
-                LastSeen = DateTime.Parse(reader.GetString(5), null, System.Globalization.DateTimeStyles.RoundtripKind),
-                IsTyping = reader.GetInt32(6) == 1,
-                TypingInConversationId = reader.IsDBNull(7) ? null : reader.GetString(7)
+                RsaPublicKey = reader.GetString(3),
+                RsaPrivateKey = reader.GetString(4),
+                ActiveConversationId = reader.IsDBNull(5) ? null : reader.GetString(5),
+                Status = (UserStatus)reader.GetInt32(6),
+                LastSeen = DateTime.Parse(reader.GetString(7), null, System.Globalization.DateTimeStyles.RoundtripKind),
+                IsTyping = reader.GetInt32(8) == 1,
+                TypingInConversationId = reader.IsDBNull(9) ? null : reader.GetString(9)
             };
 
             user.SetState(CreateState(user.Status));
