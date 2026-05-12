@@ -90,6 +90,40 @@ public partial class LoginWindow : Window
         StatusBorder.Visibility = Visibility.Collapsed;
     }
 
+    private void UsernameTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateUsernamePlaceholder();
+    }
+
+    private void UsernameTextBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        UpdateUsernamePlaceholder();
+    }
+
+    private void UpdateUsernamePlaceholder()
+    {
+        UsernamePlaceholder.Visibility = string.IsNullOrEmpty(UsernameTextBox.Text)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        UpdatePasswordPlaceholder();
+    }
+
+    private void PasswordBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        UpdatePasswordPlaceholder();
+    }
+
+    private void UpdatePasswordPlaceholder()
+    {
+        PasswordPlaceholder.Visibility = string.IsNullOrEmpty(PasswordBox.Password)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
     private void ShowStatus(string message, bool isError)
     {
         StatusTextBlock.Text = message;

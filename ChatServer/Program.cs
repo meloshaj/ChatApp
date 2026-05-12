@@ -244,12 +244,10 @@ class Program
     {
         if (string.Equals(incoming.Type, "typing", StringComparison.OrdinalIgnoreCase))
         {
-            var parts = incoming.Text.Split('|');
-            if (parts.Length >= 2)
+            if (!string.IsNullOrWhiteSpace(user.ActiveConversationId) &&
+                bool.TryParse(incoming.Text, out bool isTyping))
             {
-                string conversationId = parts[0];
-                bool isTyping = parts.Length > 1 && bool.Parse(parts[1]);
-                await chatService.NotifyTypingAsync(user, conversationId, isTyping);
+                await chatService.NotifyTypingAsync(user, user.ActiveConversationId, isTyping);
             }
             return;
         }

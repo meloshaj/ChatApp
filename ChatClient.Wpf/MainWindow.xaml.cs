@@ -33,6 +33,7 @@ public partial class MainWindow : Window
         RefreshHeader();
         UpdateUiState();
         SearchTextBox.Text = string.Empty;
+        UpdateMainInputPlaceholders();
         
         // Hide connection controls since we're already authenticated
         ConnectionPanel.Visibility = Visibility.Collapsed;
@@ -60,27 +61,33 @@ public partial class MainWindow : Window
         RefreshConversationList();
     }
 
-    private void OpenAnotherClientButton_Click(object sender, RoutedEventArgs e)
+    private async void LogoutButton_Click(object sender, RoutedEventArgs e)
     {
-        string executablePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
-        {
-            HandleStatusChanged("Could not locate the client executable.");
-            return;
-        }
-
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = executablePath,
-            WorkingDirectory = Path.GetDirectoryName(executablePath) ?? Environment.CurrentDirectory,
-            UseShellExecute = true
-        });
+        await session.DisconnectAsync();
+        new LoginWindow().Show();
+        Close();
     }
 
     private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        UpdatePlaceholder(SearchTextBox, SearchPlaceholder);
         session.SetSearchText(SearchTextBox.Text);
         RefreshConversationList();
+    }
+
+    private void FriendUserTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdatePlaceholder(FriendUserTextBox, FriendUserPlaceholder);
+    }
+
+    private void GroupNameTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdatePlaceholder(GroupNameTextBox, GroupNamePlaceholder);
+    }
+
+    private void GroupMemberTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdatePlaceholder(GroupMemberTextBox, GroupMemberPlaceholder);
     }
 
     private async void ContactsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -167,6 +174,20 @@ public partial class MainWindow : Window
         RefreshConversationList();
     }
 
+    private async void RemoveFromGroupButton_Click(object sender, RoutedEventArgs e)
+    {
+        await session.RemoveFromGroupAsync(GroupNameTextBox.Text, GroupMemberTextBox.Text);
+        RefreshConversationList();
+        RefreshHeader();
+    }
+
+    private async void RenameGroupButton_Click(object sender, RoutedEventArgs e)
+    {
+        await session.RenameGroupAsync(GroupNameTextBox.Text, GroupMemberTextBox.Text);
+        RefreshConversationList();
+        RefreshHeader();
+    }
+
     private async void OpenGroupChatButton_Click(object sender, RoutedEventArgs e)
     {
         await session.OpenGroupChatAsync(GroupNameTextBox.Text);
@@ -179,6 +200,31 @@ public partial class MainWindow : Window
     {
         await session.SendTextMessageAsync(MessageInputTextBox.Text);
         MessageInputTextBox.Clear();
+    }
+
+    private void EmojiButton_Click(object sender, RoutedEventArgs e)
+    {
+        EmojiPopup.IsOpen = !EmojiPopup.IsOpen;
+    }
+
+    private void EmojiPickerButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Content is not string emoji)
+        {
+            return;
+        }
+
+        int insertionIndex = MessageInputTextBox.CaretIndex;
+        MessageInputTextBox.Text = MessageInputTextBox.Text.Insert(insertionIndex, emoji);
+        MessageInputTextBox.CaretIndex = insertionIndex + emoji.Length;
+        MessageInputTextBox.Focus();
+        EmojiPopup.IsOpen = false;
+    }
+
+    private void MessageInputTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdatePlaceholder(MessageInputTextBox, MessageInputPlaceholder);
+        _ = session.SendTypingStateAsync(!string.IsNullOrWhiteSpace(MessageInputTextBox.Text));
     }
 
     private async void MessageInputTextBox_KeyDown(object sender, KeyEventArgs e)
@@ -194,6 +240,7 @@ public partial class MainWindow : Window
     private async void SendImageButton_Click(object sender, RoutedEventArgs e)
     {
         await session.SendPendingAttachmentAsync(VoiceDurationTextBox.Text);
+        ClearAttachmentPreview();
     }
 
     private void BrowseImageButton_Click(object sender, RoutedEventArgs e)
@@ -202,6 +249,7 @@ public partial class MainWindow : Window
         {
             ImagePathTextBox.Text = filePath;
             session.SetPendingAttachment(ChatClientSession.AttachmentKind.Image, filePath);
+            ShowAttachmentPreview("Image", filePath);
             HandleStatusChanged("Image file selected.");
         }
     }
@@ -212,6 +260,7 @@ public partial class MainWindow : Window
         {
             VoicePathTextBox.Text = filePath;
             session.SetPendingAttachment(ChatClientSession.AttachmentKind.Voice, filePath);
+            ShowAttachmentPreview("Voice", filePath);
             HandleStatusChanged("Voice file selected.");
         }
     }
@@ -227,6 +276,7 @@ public partial class MainWindow : Window
         {
             VoicePathTextBox.Text = filePath;
             session.SetPendingAttachment(ChatClientSession.AttachmentKind.Audio, filePath);
+            ShowAttachmentPreview("Audio", filePath);
             HandleStatusChanged("Audio file selected.");
         }
     }
@@ -237,6 +287,7 @@ public partial class MainWindow : Window
         {
             VideoPathTextBox.Text = filePath;
             session.SetPendingAttachment(ChatClientSession.AttachmentKind.Video, filePath);
+            ShowAttachmentPreview("Video", filePath);
             HandleStatusChanged("Video file selected.");
         }
     }
@@ -282,13 +333,24 @@ public partial class MainWindow : Window
         {
             ChatHeaderName.Text = item.DisplayName;
             ChatHeaderInitials.Text = item.Initials;
-            ChatHeaderStatus.Text = item.TargetType == ConversationTargetType.Group ? "Group conversation" : item.StatusText;
+            ChatHeaderStatus.Text = item.TargetType == ConversationTargetType.Group ? session.GetHeaderStatus() : item.StatusText;
+            RefreshHeaderMembers();
             return;
         }
 
         ChatHeaderName.Text = session.GetHeaderName();
         ChatHeaderInitials.Text = session.GetHeaderInitials();
-        ChatHeaderStatus.Text = session.GetHeaderStatus();
+        ChatHeaderStatus.Text = string.IsNullOrWhiteSpace(session.TypingStatusText)
+            ? session.GetHeaderStatus()
+            : session.TypingStatusText;
+        RefreshHeaderMembers();
+    }
+
+    private void RefreshHeaderMembers()
+    {
+        string membersText = session.GetSelectedGroupMembersText();
+        ChatHeaderMembers.Text = membersText;
+        ChatHeaderMembers.Visibility = string.IsNullOrWhiteSpace(membersText) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void UpdateUiState()
@@ -301,24 +363,60 @@ public partial class MainWindow : Window
         PortTextBox.IsEnabled = !session.IsConnected;
         UsernameTextBox.IsEnabled = !session.IsConnected;
         RefreshButton.IsEnabled = canUseCommands;
+        LogoutButton.IsEnabled = true;
         AddFriendButton.IsEnabled = canUseCommands;
         OpenPrivateChatButton.IsEnabled = canUseCommands;
         CreateGroupButton.IsEnabled = canUseCommands;
         AddToGroupButton.IsEnabled = canUseCommands;
         OpenGroupChatButton.IsEnabled = canUseCommands;
+        RemoveFromGroupButton.IsEnabled = canUseCommands;
+        RenameGroupButton.IsEnabled = canUseCommands;
         SendButton.IsEnabled = canSend;
         SendImageButton.IsEnabled = canSend;
-        SendVoiceButton.IsEnabled = canSend;
-        SendVideoButton.IsEnabled = canSend;
         BrowseImageButton.IsEnabled = canSend;
         BrowseVoiceButton.IsEnabled = canSend;
         BrowseVideoButton.IsEnabled = canSend;
+        EmojiButton.IsEnabled = canSend;
         MessageInputTextBox.IsEnabled = canSend;
         ImagePathTextBox.IsEnabled = canSend;
         VoicePathTextBox.IsEnabled = canSend;
         VoiceDurationTextBox.IsEnabled = canSend;
         VideoPathTextBox.IsEnabled = canSend;
         ContactsListBox.IsEnabled = canUseCommands;
+        ClearChatButton.IsEnabled = canSend;
+    }
+
+    private void ClearChatButton_Click(object sender, RoutedEventArgs e)
+    {
+        session.ClearSelectedVisibleMessages();
+    }
+
+    private void ShowAttachmentPreview(string kind, string filePath)
+    {
+        AttachmentPreviewTextBlock.Text = $"{kind}: {Path.GetFileName(filePath)}";
+        AttachmentPreviewTextBlock.Visibility = Visibility.Visible;
+    }
+
+    private void ClearAttachmentPreview()
+    {
+        AttachmentPreviewTextBlock.Text = string.Empty;
+        AttachmentPreviewTextBlock.Visibility = Visibility.Collapsed;
+    }
+
+    private void UpdateMainInputPlaceholders()
+    {
+        UpdatePlaceholder(SearchTextBox, SearchPlaceholder);
+        UpdatePlaceholder(FriendUserTextBox, FriendUserPlaceholder);
+        UpdatePlaceholder(GroupNameTextBox, GroupNamePlaceholder);
+        UpdatePlaceholder(GroupMemberTextBox, GroupMemberPlaceholder);
+        UpdatePlaceholder(MessageInputTextBox, MessageInputPlaceholder);
+    }
+
+    private static void UpdatePlaceholder(TextBox textBox, TextBlock placeholder)
+    {
+        placeholder.Visibility = string.IsNullOrEmpty(textBox.Text)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     protected override async void OnClosed(EventArgs e)

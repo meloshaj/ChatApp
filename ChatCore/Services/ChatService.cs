@@ -38,7 +38,7 @@ namespace ChatCore.Services
             processors.Add(processor);
         }
 
-        public async void SendMessage(User sender, Message message)
+        public async Task SendMessageAsync(User sender, Message message)
         {
             // Process message through pipeline
             foreach (var processor in processors)
@@ -78,7 +78,7 @@ namespace ChatCore.Services
             }
         }
 
-        public async void SendDirectMessage(User recipient, Message message)
+        public async Task SendDirectMessageAsync(User recipient, Message message)
         {
             await SendToUserAsync(recipient, message);
         }
@@ -214,11 +214,17 @@ namespace ChatCore.Services
                 var stream = user.GetStream();
                 if (stream == null) return;
 
+                var conversation = await conversationRepository.GetByIdAsync(notification.ConversationId);
+                string scope = conversation is GroupConversation ? "Group" : "Private";
+                string name = conversation is PrivateConversation privateConversation
+                    ? GetPrivateConversationLabel(privateConversation, user)
+                    : conversation?.Name ?? notification.ConversationId;
+
                 var networkMessage = new NetworkMessage
                 {
                     Sender = "System",
                     Type = "typing",
-                    Text = $"{notification.Username}|{notification.ConversationId}|{notification.IsTyping}",
+                    Text = $"{notification.Username}|{scope}|{name}|{notification.IsTyping}",
                     Timestamp = notification.Timestamp
                 };
 
@@ -239,6 +245,7 @@ namespace ChatCore.Services
                 return new NetworkMessage
                 {
                     Sender = message.SenderId,
+                    MessageId = message.Id,
                     Type = "image",
                     Text = body,
                     ImageData = imageMessage.ImageData,
@@ -251,6 +258,7 @@ namespace ChatCore.Services
                 return new NetworkMessage
                 {
                     Sender = message.SenderId,
+                    MessageId = message.Id,
                     Type = "audio",
                     Text = body,
                     FileName = audioMessage.FileName,
@@ -264,6 +272,7 @@ namespace ChatCore.Services
                 return new NetworkMessage
                 {
                     Sender = message.SenderId,
+                    MessageId = message.Id,
                     Type = "video",
                     Text = body,
                     FileName = videoMessage.FileName,
@@ -277,6 +286,7 @@ namespace ChatCore.Services
                 return new NetworkMessage
                 {
                     Sender = message.SenderId,
+                    MessageId = message.Id,
                     Type = "voice",
                     Text = body,
                     FileName = voiceMessage.FileName,
@@ -289,6 +299,7 @@ namespace ChatCore.Services
             return new NetworkMessage
             {
                 Sender = message.SenderId,
+                MessageId = message.Id,
                 Type = "text",
                 Text = body,
                 Timestamp = message.Timestamp

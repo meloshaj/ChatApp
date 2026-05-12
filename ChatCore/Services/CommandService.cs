@@ -39,7 +39,7 @@ namespace ChatCore.Services
         {
             await SendSystemMessageAsync(user, $"Welcome back, {user.Username}!");
             await SendSystemMessageAsync(user, "Commands: /users, /friends, /friend add <username>, /chat <username>");
-            await SendSystemMessageAsync(user, "/group create <group name>, /group add <group name> <username>, /group chat <group name>");
+            await SendSystemMessageAsync(user, "/group create <group name>, /group add <group name> <username>, /group chat <group name>, /group members <group name>");
             await SendSystemMessageAsync(user, "/status <online|away|busy>, /edit <messageId> <text>, /delete <messageId>, /undo");
         }
 
@@ -96,7 +96,7 @@ namespace ChatCore.Services
             }
 
             var message = messageFactory.CreateTextMessage(user.Id, user.ActiveConversationId, text);
-            chatService.SendMessage(user, message);
+            await chatService.SendMessageAsync(user, message);
         }
 
         public async Task HandleIncomingImageAsync(User user, byte[] imageData)
@@ -112,7 +112,7 @@ namespace ChatCore.Services
                 user.ActiveConversationId, 
                 "image.bin", 
                 imageData);
-            chatService.SendMessage(user, message);
+            await chatService.SendMessageAsync(user, message);
         }
 
         public async Task HandleIncomingAudioAsync(User user, string fileName, byte[] audioData)
@@ -128,7 +128,7 @@ namespace ChatCore.Services
                 user.ActiveConversationId,
                 string.IsNullOrWhiteSpace(fileName) ? "audio.bin" : fileName,
                 audioData);
-            chatService.SendMessage(user, message);
+            await chatService.SendMessageAsync(user, message);
         }
 
         public async Task HandleIncomingVideoAsync(User user, string fileName, byte[] videoData)
@@ -144,7 +144,7 @@ namespace ChatCore.Services
                 user.ActiveConversationId,
                 string.IsNullOrWhiteSpace(fileName) ? "video.bin" : fileName,
                 videoData);
-            chatService.SendMessage(user, message);
+            await chatService.SendMessageAsync(user, message);
         }
 
         public async Task HandleIncomingVoiceAsync(User user, string fileName, int durationSeconds, byte[] audioData)
@@ -161,7 +161,7 @@ namespace ChatCore.Services
                 string.IsNullOrWhiteSpace(fileName) ? "voice.bin" : fileName,
                 durationSeconds,
                 audioData);
-            chatService.SendMessage(user, message);
+            await chatService.SendMessageAsync(user, message);
         }
 
         private async Task HandleCommandAsync(User user, string input)
@@ -216,7 +216,7 @@ namespace ChatCore.Services
         {
             if (parts.Length < 2)
             {
-                await SendSystemMessageAsync(user, "Usage: /group create <group name>, /group add <group name> <username>, /group chat <group name>.");
+                await SendSystemMessageAsync(user, "Usage: /group create <group>, /group add <group> <username>, /group remove <group> <username>, /group rename <group> <new name>, /group chat <group>.");
                 return;
             }
 
@@ -231,11 +231,20 @@ namespace ChatCore.Services
                 case "add" when TrySplitGroupAndUsername(arguments, out string groupName, out string username):
                     await HandleAddToGroupAsync(user, groupName, username);
                     break;
+                case "remove" when TrySplitGroupAndUsername(arguments, out string groupName, out string username):
+                    await HandleRemoveFromGroupAsync(user, groupName, username);
+                    break;
+                case "rename" when TrySplitGroupAndUsername(arguments, out string groupName, out string newName):
+                    await HandleRenameGroupAsync(user, groupName, newName);
+                    break;
                 case "chat" when !string.IsNullOrWhiteSpace(arguments):
                     await HandleOpenGroupChatAsync(user, arguments);
                     break;
+                case "members" when !string.IsNullOrWhiteSpace(arguments):
+                    await HandleGroupMembersAsync(user, arguments);
+                    break;
                 default:
-                    await SendSystemMessageAsync(user, "Usage: /group create <group name>, /group add <group name> <username>, /group chat <group name>.");
+                    await SendSystemMessageAsync(user, "Usage: /group create <group>, /group add <group> <username>, /group remove <group> <username>, /group rename <group> <new name>, /group chat <group>.");
                     break;
             }
         }
@@ -410,6 +419,84 @@ namespace ChatCore.Services
             await userRepository.UpdateAsync(user);
             await SendSystemMessageAsync(user, $"Group chat selected: {group.Name}.");
             await ReplayConversationHistoryAsync(user, group);
+            await SendGroupMembersAsync(user, group);
+        }
+
+        private async Task HandleRemoveFromGroupAsync(User user, string groupName, string username)
+        {
+            var group = await conversationService.GetGroupConversationAsync(groupName);
+            var member = await userRepository.GetByUsernameAsync(username);
+            if (group == null || member == null)
+            {
+                await SendSystemMessageAsync(user, group == null ? "Group not found." : "User not found.");
+                return;
+            }
+
+            if (conversationService.RemoveUserFromGroup(group, user, member))
+            {
+                await conversationRepository.UpdateAsync(group);
+                await SendSystemMessageAsync(user, $"{member.Username} removed from group {group.Name}.");
+                await SendGroupMembersAsync(user, group);
+                if (member.IsOnline())
+                {
+                    await SendSystemMessageAsync(member, $"You were removed from group {group.Name}.");
+                }
+            }
+            else
+            {
+                await SendSystemMessageAsync(user, "Could not remove user from group.");
+            }
+        }
+
+        private async Task HandleRenameGroupAsync(User user, string groupName, string newName)
+        {
+            var group = await conversationService.GetGroupConversationAsync(groupName);
+            if (group == null)
+            {
+                await SendSystemMessageAsync(user, "Group not found.");
+                return;
+            }
+
+            string oldName = group.Name;
+            if (await conversationService.RenameGroupAsync(group, user, newName))
+            {
+                await SendSystemMessageAsync(user, $"Group renamed: {oldName} -> {group.Name}.");
+                await HandleGroupsCommandAsync(user);
+            }
+            else
+            {
+                await SendSystemMessageAsync(user, "Could not rename group.");
+            }
+        }
+
+        private async Task HandleGroupMembersAsync(User user, string groupName)
+        {
+            var group = await conversationService.GetGroupConversationAsync(groupName);
+            if (group == null)
+            {
+                await SendSystemMessageAsync(user, "Group not found.");
+                return;
+            }
+
+            if (!group.HasParticipant(user.Id))
+            {
+                await SendSystemMessageAsync(user, "You are not a member of that group.");
+                return;
+            }
+
+            await SendGroupMembersAsync(user, group);
+        }
+
+        private async Task SendGroupMembersAsync(User user, GroupConversation group)
+        {
+            var allUsers = await userRepository.GetAllAsync();
+            var memberNames = allUsers
+                .Where(member => group.ParticipantIds.Contains(member.Id))
+                .Select(member => member.Username)
+                .OrderBy(username => username, StringComparer.OrdinalIgnoreCase);
+
+            string members = memberNames.Any() ? string.Join(", ", memberNames) : "none";
+            await SendSystemMessageAsync(user, $"GROUP_MEMBERS|{group.Name}|{members}");
         }
 
         private async Task HandleEditMessageAsync(User user, string messageId, string newText)
@@ -454,8 +541,7 @@ namespace ChatCore.Services
         private async Task SendSystemMessageAsync(User recipient, string text)
         {
             var message = messageFactory.CreateSystemMessage(string.Empty, text);
-            chatService.SendDirectMessage(recipient, message);
-            await Task.CompletedTask;
+            await chatService.SendDirectMessageAsync(recipient, message);
         }
     }
 }

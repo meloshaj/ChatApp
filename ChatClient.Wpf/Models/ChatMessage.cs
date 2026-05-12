@@ -8,6 +8,7 @@ namespace ChatClient.Wpf.Models;
 public sealed class ChatMessage
 {
     public string Label { get; init; } = string.Empty;
+    public string MessageId { get; init; } = string.Empty;
     public string Text { get; init; } = string.Empty;
     public string Timestamp { get; init; } = string.Empty;
     public bool IsSent { get; init; }
@@ -30,29 +31,29 @@ public sealed class ChatMessage
     public Brush TimestampForeground => IsSent ? BrushFrom("#D4FFFF") : BrushFrom("#717182");
     public CornerRadius CornerRadius => IsSent ? new CornerRadius(16, 16, 4, 16) : new CornerRadius(16, 16, 16, 4);
 
-    public static ChatMessage CreateIncoming(string sender, string text, ConversationTargetType type, string conversationName, DateTime? timestamp = null) =>
-        new() { Label = sender, Text = text, Timestamp = FormatTimestamp(timestamp), IsSent = false, ConversationType = type, ConversationName = conversationName };
+    public static ChatMessage CreateIncoming(string sender, string text, ConversationTargetType type, string conversationName, DateTime? timestamp = null, string messageId = "") =>
+        new() { Label = sender, MessageId = messageId, Text = text, Timestamp = FormatTimestamp(timestamp), IsSent = false, ConversationType = type, ConversationName = conversationName };
 
-    public static ChatMessage CreateOutgoing(string text, ConversationTargetType type, string conversationName, DateTime? timestamp = null) =>
-        new() { Label = "You", Text = text, Timestamp = FormatTimestamp(timestamp), IsSent = true, ConversationType = type, ConversationName = conversationName };
+    public static ChatMessage CreateOutgoing(string text, ConversationTargetType type, string conversationName, DateTime? timestamp = null, string messageId = "") =>
+        new() { Label = "You", MessageId = messageId, Text = text, Timestamp = FormatTimestamp(timestamp), IsSent = true, ConversationType = type, ConversationName = conversationName };
 
-    public static ChatMessage CreateIncomingImage(string sender, byte[] imageData, ConversationTargetType type, string conversationName, DateTime? timestamp = null) =>
-        new() { Label = sender, Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = false, ConversationType = type, ConversationName = conversationName, InlineImage = ToBitmap(imageData) };
+    public static ChatMessage CreateIncomingImage(string sender, byte[] imageData, ConversationTargetType type, string conversationName, DateTime? timestamp = null, string messageId = "") =>
+        new() { Label = sender, MessageId = messageId, Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = false, ConversationType = type, ConversationName = conversationName, InlineImage = ToBitmap(imageData) };
 
-    public static ChatMessage CreateOutgoingImage(byte[] imageData, ConversationTargetType type, string conversationName, DateTime? timestamp = null) =>
-        new() { Label = "You", Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = true, ConversationType = type, ConversationName = conversationName, InlineImage = ToBitmap(imageData) };
+    public static ChatMessage CreateOutgoingImage(byte[] imageData, ConversationTargetType type, string conversationName, DateTime? timestamp = null, string messageId = "") =>
+        new() { Label = "You", MessageId = messageId, Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = true, ConversationType = type, ConversationName = conversationName, InlineImage = ToBitmap(imageData) };
 
-    public static ChatMessage CreateIncomingAudio(string sender, string fileName, string audioPath, string kindLabel, ConversationTargetType type, string conversationName, DateTime? timestamp = null) =>
-        new() { Label = sender, Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = false, ConversationType = type, ConversationName = conversationName, AudioPath = audioPath, AudioTitle = fileName, AudioKindLabel = kindLabel };
+    public static ChatMessage CreateIncomingAudio(string sender, string fileName, string audioPath, string kindLabel, ConversationTargetType type, string conversationName, DateTime? timestamp = null, string messageId = "") =>
+        new() { Label = sender, MessageId = messageId, Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = false, ConversationType = type, ConversationName = conversationName, AudioPath = audioPath, AudioTitle = fileName, AudioKindLabel = kindLabel };
 
-    public static ChatMessage CreateOutgoingAudio(string fileName, string audioPath, string kindLabel, ConversationTargetType type, string conversationName, DateTime? timestamp = null) =>
-        new() { Label = "You", Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = true, ConversationType = type, ConversationName = conversationName, AudioPath = audioPath, AudioTitle = fileName, AudioKindLabel = kindLabel };
+    public static ChatMessage CreateOutgoingAudio(string fileName, string audioPath, string kindLabel, ConversationTargetType type, string conversationName, DateTime? timestamp = null, string messageId = "") =>
+        new() { Label = "You", MessageId = messageId, Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = true, ConversationType = type, ConversationName = conversationName, AudioPath = audioPath, AudioTitle = fileName, AudioKindLabel = kindLabel };
 
-    public static ChatMessage CreateIncomingVideo(string sender, string fileName, string videoPath, ConversationTargetType type, string conversationName, DateTime? timestamp = null) =>
-        new() { Label = sender, Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = false, ConversationType = type, ConversationName = conversationName, VideoPath = videoPath, VideoTitle = fileName };
+    public static ChatMessage CreateIncomingVideo(string sender, string fileName, string videoPath, ConversationTargetType type, string conversationName, DateTime? timestamp = null, string messageId = "") =>
+        new() { Label = sender, MessageId = messageId, Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = false, ConversationType = type, ConversationName = conversationName, VideoPath = videoPath, VideoTitle = fileName };
 
-    public static ChatMessage CreateOutgoingVideo(string fileName, string videoPath, ConversationTargetType type, string conversationName, DateTime? timestamp = null) =>
-        new() { Label = "You", Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = true, ConversationType = type, ConversationName = conversationName, VideoPath = videoPath, VideoTitle = fileName };
+    public static ChatMessage CreateOutgoingVideo(string fileName, string videoPath, ConversationTargetType type, string conversationName, DateTime? timestamp = null, string messageId = "") =>
+        new() { Label = "You", MessageId = messageId, Text = string.Empty, Timestamp = FormatTimestamp(timestamp), IsSent = true, ConversationType = type, ConversationName = conversationName, VideoPath = videoPath, VideoTitle = fileName };
 
     private static string FormatTimestamp(DateTime? timestamp)
     {

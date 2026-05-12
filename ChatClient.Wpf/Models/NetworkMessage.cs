@@ -3,6 +3,7 @@ namespace ChatClient.Wpf.Models;
 public sealed class NetworkMessage
 {
     public string Sender { get; set; } = string.Empty;
+    public string MessageId { get; set; } = string.Empty;
     public string Type { get; set; } = "text";
     public string Text { get; set; } = string.Empty;
     public string FileName { get; set; } = string.Empty;

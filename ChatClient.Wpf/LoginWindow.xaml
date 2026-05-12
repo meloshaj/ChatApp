@@ -83,14 +83,23 @@
                            Foreground="{StaticResource ForegroundBrush}" 
                            Margin="0,0,0,8" />
                 
-                <TextBox x:Name="UsernameTextBox" 
-                         Height="44" 
-                         Padding="16,12" 
-                         Margin="0,0,0,16"
-                         Background="{StaticResource MutedBrush}"
-                         Foreground="{StaticResource ForegroundBrush}"
-                         BorderThickness="1"
-                         BorderBrush="{StaticResource BorderBrush}" />
+                <Grid Margin="0,0,0,16">
+                    <TextBox x:Name="UsernameTextBox" 
+                             Height="44" 
+                             Padding="16,12"
+                             Loaded="UsernameTextBox_Loaded"
+                             TextChanged="UsernameTextBox_TextChanged"
+                             Background="{StaticResource MutedBrush}"
+                             Foreground="{StaticResource ForegroundBrush}"
+                             BorderThickness="1"
+                             BorderBrush="{StaticResource BorderBrush}" />
+                    <TextBlock x:Name="UsernamePlaceholder"
+                               Text="Enter your username"
+                               Margin="16,0,0,0"
+                               Foreground="{StaticResource MutedForegroundBrush}"
+                               IsHitTestVisible="False"
+                               VerticalAlignment="Center" />
+                </Grid>
 
                 <!-- Password -->
                 <TextBlock Text="Password" 
@@ -99,14 +108,23 @@
                            Foreground="{StaticResource ForegroundBrush}" 
                            Margin="0,0,0,8" />
                 
-                <PasswordBox x:Name="PasswordBox" 
-                             Height="44" 
-                             Padding="16,12" 
-                             Margin="0,0,0,24"
-                             Background="{StaticResource MutedBrush}"
-                             Foreground="{StaticResource ForegroundBrush}"
-                             BorderThickness="1"
-                             BorderBrush="{StaticResource BorderBrush}" />
+                <Grid Margin="0,0,0,24">
+                    <PasswordBox x:Name="PasswordBox" 
+                                 Height="44" 
+                                 Padding="16,12"
+                                 Loaded="PasswordBox_Loaded"
+                                 PasswordChanged="PasswordBox_PasswordChanged"
+                                 Background="{StaticResource MutedBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"
+                                 BorderThickness="1"
+                                 BorderBrush="{StaticResource BorderBrush}" />
+                    <TextBlock x:Name="PasswordPlaceholder"
+                               Text="Enter your password"
+                               Margin="16,0,0,0"
+                               Foreground="{StaticResource MutedForegroundBrush}"
+                               IsHitTestVisible="False"
+                               VerticalAlignment="Center" />
+                </Grid>
 
                 <!-- Login Button -->
                 <Button x:Name="LoginButton" 

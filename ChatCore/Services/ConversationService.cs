@@ -71,5 +71,34 @@ namespace ChatCore.Services
             conversation.AddParticipant(newMember);
             return true;
         }
+
+        public bool RemoveUserFromGroup(GroupConversation conversation, User requester, User member)
+        {
+            if (conversation.OwnerId != requester.Id || member.Id == requester.Id)
+            {
+                return false;
+            }
+
+            return conversation.ParticipantIds.Remove(member.Id);
+        }
+
+        public async Task<bool> RenameGroupAsync(GroupConversation conversation, User requester, string newName)
+        {
+            string normalizedName = newName.Trim();
+            if (conversation.OwnerId != requester.Id || string.IsNullOrWhiteSpace(normalizedName))
+            {
+                return false;
+            }
+
+            var existing = await conversationRepository.GetGroupByNameAsync(normalizedName);
+            if (existing != null && existing.Id != conversation.Id)
+            {
+                return false;
+            }
+
+            conversation.Name = normalizedName;
+            await conversationRepository.UpdateAsync(conversation);
+            return true;
+        }
     }
 }

@@ -22,6 +22,7 @@ public sealed class ChatClientSession
     private const int MaxVideoBytes = 8 * 1024 * 1024;
     private const int MaxAudioBytes = 8 * 1024 * 1024;
     private readonly List<ChatMessage> allMessages = [];
+    private readonly Dictionary<string, IReadOnlyList<string>> groupMembers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ObservableCollection<ChatMessage> visibleMessages = [];
     private readonly ObservableCollection<ConversationListItem> conversations = [];
     private TcpClient? client;
@@ -35,6 +36,8 @@ public sealed class ChatClientSession
     private ConversationTargetType selectedConversationType;
     private string? pendingAttachmentPath;
     private AttachmentKind pendingAttachmentKind;
+    private string typingStatusText = string.Empty;
+    private bool lastTypingState;
 
     public ObservableCollection<ChatMessage> VisibleMessages => visibleMessages;
     public ObservableCollection<ConversationListItem> Conversations => conversations;
@@ -42,6 +45,7 @@ public sealed class ChatClientSession
     public string? CurrentUsername => currentUsername;
     public string? SelectedConversationName => selectedConversationName;
     public ConversationTargetType SelectedConversationType => selectedConversationType;
+    public string TypingStatusText => typingStatusText;
 
     public event Action<string>? StatusChanged;
     public event Action? ConversationCollectionChanged;
@@ -210,6 +214,7 @@ public sealed class ChatClientSession
         }
 
         await SendCommandAsync($"/group chat {trimmedGroupName}");
+        await SendCommandAsync($"/group members {trimmedGroupName}");
         await SendCommandAsync("/groups");
     }
 
@@ -222,6 +227,32 @@ public sealed class ChatClientSession
         }
 
         await SendCommandAsync($"/group add {groupName.Trim()} {username.Trim()}");
+        await SendCommandAsync($"/group members {groupName.Trim()}");
+        await SendCommandAsync("/groups");
+    }
+
+    public async Task RemoveFromGroupAsync(string groupName, string username)
+    {
+        if (string.IsNullOrWhiteSpace(groupName) || string.IsNullOrWhiteSpace(username))
+        {
+            OnStatusChanged("Enter a group name and member username.");
+            return;
+        }
+
+        await SendCommandAsync($"/group remove {groupName.Trim()} {username.Trim()}");
+        await SendCommandAsync($"/group members {groupName.Trim()}");
+        await SendCommandAsync("/groups");
+    }
+
+    public async Task RenameGroupAsync(string groupName, string newName)
+    {
+        if (string.IsNullOrWhiteSpace(groupName) || string.IsNullOrWhiteSpace(newName))
+        {
+            OnStatusChanged("Enter a group name and new name.");
+            return;
+        }
+
+        await SendCommandAsync($"/group rename {groupName.Trim()} {newName.Trim()}");
         await SendCommandAsync("/groups");
     }
 
@@ -236,12 +267,22 @@ public sealed class ChatClientSession
         if (IsSelectedConversation(groupName.Trim(), ConversationTargetType.Group))
         {
             SetSelectedConversation(groupName.Trim(), ConversationTargetType.Group);
+            await RefreshSelectedGroupMembersAsync();
             return;
         }
 
         if (await SendCommandAsync($"/group chat {groupName.Trim()}"))
         {
             SetSelectedConversation(groupName.Trim(), ConversationTargetType.Group);
+            await RefreshSelectedGroupMembersAsync();
+        }
+    }
+
+    public async Task RefreshSelectedGroupMembersAsync()
+    {
+        if (selectedConversationType == ConversationTargetType.Group && !string.IsNullOrWhiteSpace(selectedConversationName))
+        {
+            await SendCommandAsync($"/group members {selectedConversationName}");
         }
     }
 
@@ -259,6 +300,24 @@ public sealed class ChatClientSession
         }
 
         await SendRawAsync(trimmed);
+        await SendTypingStateAsync(false);
+    }
+
+    public async Task SendTypingStateAsync(bool isTyping)
+    {
+        if (!isConnected || selectedConversationType == ConversationTargetType.None || lastTypingState == isTyping)
+        {
+            return;
+        }
+
+        lastTypingState = isTyping;
+        await SendRawMessageAsync(new NetworkMessage
+        {
+            Sender = currentUsername ?? "Me",
+            Type = "typing",
+            Text = isTyping.ToString(),
+            Timestamp = DateTime.UtcNow
+        });
     }
 
     public async Task SendImageAsync(string filePath)
@@ -479,8 +538,20 @@ public sealed class ChatClientSession
             item.Name.Equals(selectedConversationName, StringComparison.OrdinalIgnoreCase));
 
         return selectedConversationType == ConversationTargetType.Group
-            ? "Group conversation"
+            ? GetGroupHeaderStatus(selectedConversationName)
             : selected?.StatusText ?? "Direct conversation";
+    }
+
+    public string GetSelectedGroupMembersText()
+    {
+        if (selectedConversationType != ConversationTargetType.Group || string.IsNullOrWhiteSpace(selectedConversationName))
+        {
+            return string.Empty;
+        }
+
+        return groupMembers.TryGetValue(selectedConversationName, out IReadOnlyList<string>? members) && members.Count > 0
+            ? "Members: " + string.Join(", ", members)
+            : "Members: loading...";
     }
 
     private bool EnsureConversationSelected()
@@ -583,7 +654,7 @@ public sealed class ChatClientSession
             ChatMessage? imageMessage = TryParseImageMessage(incoming);
             if (imageMessage != null)
             {
-                allMessages.Add(imageMessage);
+                AddMessageIfNew(imageMessage);
                 RefreshVisibleMessages();
                 ConversationCollectionChanged?.Invoke();
                 OnStatusChanged("Image received.");
@@ -597,7 +668,7 @@ public sealed class ChatClientSession
             ChatMessage? audioMessage = TryParseAudioMessage(incoming, "Audio attachment");
             if (audioMessage != null)
             {
-                allMessages.Add(audioMessage);
+                AddMessageIfNew(audioMessage);
                 RefreshVisibleMessages();
                 ConversationCollectionChanged?.Invoke();
                 OnStatusChanged("Audio received.");
@@ -611,7 +682,7 @@ public sealed class ChatClientSession
             ChatMessage? videoMessage = TryParseVideoMessage(incoming);
             if (videoMessage != null)
             {
-                allMessages.Add(videoMessage);
+                AddMessageIfNew(videoMessage);
                 RefreshVisibleMessages();
                 ConversationCollectionChanged?.Invoke();
                 OnStatusChanged("Video received.");
@@ -628,12 +699,18 @@ public sealed class ChatClientSession
             ChatMessage? voiceMessage = TryParseAudioMessage(incoming, kindLabel);
             if (voiceMessage != null)
             {
-                allMessages.Add(voiceMessage);
+                AddMessageIfNew(voiceMessage);
                 RefreshVisibleMessages();
                 ConversationCollectionChanged?.Invoke();
                 OnStatusChanged("Voice message received.");
             }
 
+            return;
+        }
+
+        if (string.Equals(incoming.Type, "typing", StringComparison.OrdinalIgnoreCase))
+        {
+            UpdateTypingStatus(incoming.Text);
             return;
         }
 
@@ -649,7 +726,7 @@ public sealed class ChatClientSession
             ChatMessage? message = TryParseConversationMessage(incoming);
             if (message != null)
             {
-                allMessages.Add(message);
+                bool added = AddMessageIfNew(message);
                 ConversationListItem? item = conversations.FirstOrDefault(existing =>
                     existing.TargetType == message.ConversationType &&
                     existing.Name.Equals(message.ConversationName, StringComparison.OrdinalIgnoreCase));
@@ -663,6 +740,45 @@ public sealed class ChatClientSession
                 ConversationCollectionChanged?.Invoke();
             }
         }
+    }
+
+    private bool AddMessageIfNew(ChatMessage message)
+    {
+        if (!string.IsNullOrWhiteSpace(message.MessageId) &&
+            allMessages.Any(existing => existing.MessageId.Equals(message.MessageId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        allMessages.Add(message);
+        if (!IsSelectedConversation(message.ConversationName, message.ConversationType))
+        {
+            ConversationListItem? item = conversations.FirstOrDefault(existing =>
+                existing.TargetType == message.ConversationType &&
+                existing.Name.Equals(message.ConversationName, StringComparison.OrdinalIgnoreCase));
+            if (item != null)
+            {
+                item.UnreadCount++;
+            }
+        }
+
+        return true;
+    }
+
+    public void ClearSelectedVisibleMessages()
+    {
+        if (selectedConversationType == ConversationTargetType.None || string.IsNullOrWhiteSpace(selectedConversationName))
+        {
+            OnStatusChanged("Select a chat to clear.");
+            return;
+        }
+
+        allMessages.RemoveAll(message =>
+            message.ConversationType == selectedConversationType &&
+            message.ConversationName.Equals(selectedConversationName, StringComparison.OrdinalIgnoreCase));
+        RefreshVisibleMessages();
+        ConversationCollectionChanged?.Invoke();
+        OnStatusChanged("Chat view cleared locally.");
     }
 
     private ChatMessage? TryParseImageMessage(NetworkMessage incoming)
@@ -704,8 +820,8 @@ public sealed class ChatClientSession
         string sender = body[..separatorIndex];
         bool isOutgoing = string.Equals(sender, currentUsername, StringComparison.OrdinalIgnoreCase);
         return isOutgoing
-            ? ChatMessage.CreateOutgoingImage(incoming.ImageData, conversationType, conversationName, incoming.Timestamp)
-            : ChatMessage.CreateIncomingImage(sender, incoming.ImageData, conversationType, conversationName, incoming.Timestamp);
+            ? ChatMessage.CreateOutgoingImage(incoming.ImageData, conversationType, conversationName, incoming.Timestamp, incoming.MessageId)
+            : ChatMessage.CreateIncomingImage(sender, incoming.ImageData, conversationType, conversationName, incoming.Timestamp, incoming.MessageId);
     }
 
     private ChatMessage? TryParseVideoMessage(NetworkMessage incoming)
@@ -750,8 +866,8 @@ public sealed class ChatClientSession
         string videoPath = SaveIncomingVideo(fileName, incoming.VideoData);
 
         return isOutgoing
-            ? ChatMessage.CreateOutgoingVideo(fileName, videoPath, conversationType, conversationName, incoming.Timestamp)
-            : ChatMessage.CreateIncomingVideo(sender, fileName, videoPath, conversationType, conversationName, incoming.Timestamp);
+            ? ChatMessage.CreateOutgoingVideo(fileName, videoPath, conversationType, conversationName, incoming.Timestamp, incoming.MessageId)
+            : ChatMessage.CreateIncomingVideo(sender, fileName, videoPath, conversationType, conversationName, incoming.Timestamp, incoming.MessageId);
     }
 
     private ChatMessage? TryParseAudioMessage(NetworkMessage incoming, string kindLabel)
@@ -796,8 +912,8 @@ public sealed class ChatClientSession
         string audioPath = SaveIncomingMedia("Audio", fileName, incoming.AudioData);
 
         return isOutgoing
-            ? ChatMessage.CreateOutgoingAudio(fileName, audioPath, kindLabel, conversationType, conversationName, incoming.Timestamp)
-            : ChatMessage.CreateIncomingAudio(sender, fileName, audioPath, kindLabel, conversationType, conversationName, incoming.Timestamp);
+            ? ChatMessage.CreateOutgoingAudio(fileName, audioPath, kindLabel, conversationType, conversationName, incoming.Timestamp, incoming.MessageId)
+            : ChatMessage.CreateIncomingAudio(sender, fileName, audioPath, kindLabel, conversationType, conversationName, incoming.Timestamp, incoming.MessageId);
     }
 
     private void ResetConversationHistory(string message)
@@ -867,6 +983,12 @@ public sealed class ChatClientSession
             return;
         }
 
+        if (message.StartsWith("GROUP_MEMBERS|", StringComparison.Ordinal))
+        {
+            UpdateGroupMembers(message);
+            return;
+        }
+
         if (message.StartsWith("Chat selected: ", StringComparison.OrdinalIgnoreCase) && message.EndsWith('.'))
         {
             SetSelectedConversation(message[15..^1], ConversationTargetType.Private);
@@ -888,6 +1010,19 @@ public sealed class ChatClientSession
             string groupName = message[21..^1];
             EnsureConversation(groupName, ConversationTargetType.Group, true);
             SetSelectedConversation(groupName, ConversationTargetType.Group);
+            OnStatusChanged(message);
+            return;
+        }
+
+        if (message.StartsWith("Group renamed: ", StringComparison.OrdinalIgnoreCase) && message.EndsWith('.'))
+        {
+            string rename = message[15..^1];
+            string[] parts = rename.Split(" -> ", 2, StringSplitOptions.TrimEntries);
+            if (parts.Length == 2)
+            {
+                RenameLocalGroup(parts[0], parts[1]);
+            }
+
             OnStatusChanged(message);
             return;
         }
@@ -964,9 +1099,57 @@ public sealed class ChatClientSession
         selectedConversationName = name;
         selectedConversationType = type;
         EnsureConversation(name, type, true);
+        ConversationListItem? selected = conversations.FirstOrDefault(item => item.TargetType == type && item.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (selected != null)
+        {
+            selected.UnreadCount = 0;
+        }
+
+        typingStatusText = string.Empty;
+        lastTypingState = false;
         RefreshVisibleMessages();
         ConversationSelectionChanged?.Invoke();
         ConversationCollectionChanged?.Invoke();
+    }
+
+    private void RenameLocalGroup(string oldName, string newName)
+    {
+        ConversationListItem? item = conversations.FirstOrDefault(existing =>
+            existing.TargetType == ConversationTargetType.Group &&
+            existing.Name.Equals(oldName, StringComparison.OrdinalIgnoreCase));
+        if (item != null)
+        {
+            item.Name = newName;
+            item.DisplayName = newName;
+            item.Initials = GetInitials(newName);
+        }
+
+        if (IsSelectedConversation(oldName, ConversationTargetType.Group))
+        {
+            selectedConversationName = newName;
+            RefreshVisibleMessages();
+        }
+
+        ConversationSelectionChanged?.Invoke();
+        ConversationCollectionChanged?.Invoke();
+    }
+
+    private void UpdateTypingStatus(string text)
+    {
+        string[] parts = text.Split('|', 4);
+        if (parts.Length != 4 || !bool.TryParse(parts[3], out bool isTyping))
+        {
+            return;
+        }
+
+        ConversationTargetType type = parts[1] == "Group" ? ConversationTargetType.Group : ConversationTargetType.Private;
+        if (!IsSelectedConversation(parts[2], type))
+        {
+            return;
+        }
+
+        typingStatusText = isTyping ? $"{parts[0]} is typing..." : string.Empty;
+        ConversationSelectionChanged?.Invoke();
     }
 
     private bool IsSelectedConversation(string name, ConversationTargetType type)
@@ -1023,8 +1206,8 @@ public sealed class ChatClientSession
             string sender = body[..separatorIndex];
             string text = body[(separatorIndex + 2)..];
             return string.Equals(sender, currentUsername, StringComparison.OrdinalIgnoreCase)
-                ? ChatMessage.CreateOutgoing(text, conversationType, conversationName, incoming.Timestamp)
-                : ChatMessage.CreateIncoming(sender, text, conversationType, conversationName, incoming.Timestamp);
+                ? ChatMessage.CreateOutgoing(text, conversationType, conversationName, incoming.Timestamp, incoming.MessageId)
+                : ChatMessage.CreateIncoming(sender, text, conversationType, conversationName, incoming.Timestamp, incoming.MessageId);
         }
 
         return ChatMessage.CreateIncoming(
@@ -1032,7 +1215,8 @@ public sealed class ChatClientSession
             body,
             conversationType,
             conversationName,
-            incoming.Timestamp);
+            incoming.Timestamp,
+            incoming.MessageId);
     }
 
     private static IEnumerable<string> ParseList(string input)
@@ -1094,6 +1278,35 @@ public sealed class ChatClientSession
             "offline" => BrushFrom("#94A3B8"),
             _ => BrushFrom("#10B981")
         };
+    }
+
+    private string GetGroupHeaderStatus(string groupName)
+    {
+        if (groupMembers.TryGetValue(groupName, out IReadOnlyList<string>? members) && members.Count > 0)
+        {
+            return members.Count == 1 ? "1 member" : $"{members.Count} members";
+        }
+
+        return "Group conversation";
+    }
+
+    private void UpdateGroupMembers(string message)
+    {
+        string[] parts = message.Split('|', 3);
+        if (parts.Length != 3 || string.IsNullOrWhiteSpace(parts[1]))
+        {
+            return;
+        }
+
+        string groupName = parts[1].Trim();
+        IReadOnlyList<string> members = string.Equals(parts[2].Trim(), "none", StringComparison.OrdinalIgnoreCase)
+            ? []
+            : ParseList(parts[2]).ToList();
+
+        groupMembers[groupName] = members;
+        EnsureConversation(groupName, ConversationTargetType.Group, true);
+        ConversationSelectionChanged?.Invoke();
+        ConversationCollectionChanged?.Invoke();
     }
 
     private readonly record struct ParsedConversationTarget(string Name, string StatusText, SolidColorBrush StatusBrush);

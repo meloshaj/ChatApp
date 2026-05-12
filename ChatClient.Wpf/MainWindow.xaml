@@ -36,26 +36,28 @@
                         <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Right">
                             <Button x:Name="RefreshButton"
-                                    Style="{StaticResource IconButtonStyle}"
+                                    Style="{StaticResource PlainIconButtonStyle}"
                                     ToolTip="Refresh"
-                                    Margin="4,0"
+                                    Margin="4,0,8,0"
                                     Click="RefreshButton_Click">
                                 <Image Source="refreshICON.png"
                                        Stretch="Uniform"
-                                       Width="18"
-                                       Height="18"
+                                       Width="32"
+                                       Height="32"
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                             </Button>
-                            <Button x:Name="OpenAnotherClientButton"
+                            <Button x:Name="LogoutButton"
                                     Style="{StaticResource IconButtonStyle}"
-                                    ToolTip="Open Another Client"
+                                    ToolTip="Logout"
                                     Margin="4,0"
-                                    Click="OpenAnotherClientButton_Click">
-                                <Path Data="M4 4h7v2H6v5H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z"
-                                      Fill="{StaticResource ForegroundBrush}"
+                                    Click="LogoutButton_Click">
+                                <Path Data="M10 6H6a2 2 0 00-2 2v8a2 2 0 002 2h4M14 8l4 4-4 4M18 12H9"
+                                      Stroke="{StaticResource ForegroundBrush}"
+                                      StrokeThickness="2"
+                                      Fill="Transparent"
                                       Stretch="Uniform"
-                                      Width="18"
-                                      Height="18" />
+                                      Width="20"
+                                      Height="20" />
                             </Button>
                         </StackPanel>
                     </Grid>
@@ -115,10 +117,19 @@
 
                     <Grid>
                         <TextBox x:Name="SearchTextBox"
-                                 Style="{StaticResource SearchTextBoxStyle}"
+                                 Height="40"
                                  Padding="36,10,10,10"
-                                 Tag="Search"
+                                 Background="{StaticResource MutedBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"
+                                 BorderThickness="1"
+                                 BorderBrush="{StaticResource BorderBrush}"
                                  TextChanged="SearchTextBox_TextChanged" />
+                        <TextBlock x:Name="SearchPlaceholder"
+                                   Text="Search"
+                                   Margin="36,0,0,0"
+                                   Foreground="{StaticResource MutedForegroundBrush}"
+                                   IsHitTestVisible="False"
+                                   VerticalAlignment="Center" />
                         <Path Data="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                               Stroke="{StaticResource MutedForegroundBrush}"
                               StrokeThickness="2"
@@ -223,10 +234,32 @@
                                         Background="{StaticResource MutedBrush}"
                                         CornerRadius="10"
                                         VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding TypeLabel}"
-                                               FontSize="10"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource MutedForegroundBrush}" />
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding TypeLabel}"
+                                                   FontSize="10"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource MutedForegroundBrush}" />
+                                        <Border Background="{StaticResource PrimaryBlueBrush}"
+                                                Padding="6,2"
+                                                Margin="0,4,0,0"
+                                                CornerRadius="8">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasUnread}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding UnreadLabel}"
+                                                       FontSize="10"
+                                                       FontWeight="Bold"
+                                                       Foreground="White"
+                                                       HorizontalAlignment="Center" />
+                                        </Border>
+                                    </StackPanel>
                                 </Border>
                             </Grid>
                         </DataTemplate>
@@ -267,29 +300,28 @@
                                                Foreground="{StaticResource MutedForegroundBrush}" />
                                 </StackPanel>
                             </StackPanel>
-                            <Button Grid.Column="1"
-                                    Style="{StaticResource IconButtonStyle}"
-                                    Width="32"
-                                    Height="32"
-                                    ToolTip="Refresh"
-                                    Click="RefreshButton_Click">
-                                <Image Source="refreshICON.png"
-                                       Stretch="Uniform"
-                                       Width="16"
-                                       Height="16"
-                                       RenderOptions.BitmapScalingMode="HighQuality" />
-                            </Button>
                         </Grid>
 
                         <TextBlock Margin="0,12,0,6"
                                    Text="Friends and groups"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource ForegroundBrush}" />
-                        <TextBox x:Name="FriendUserTextBox"
-                                 Style="{StaticResource SearchTextBoxStyle}"
-                                 Height="36"
-                                 Padding="12,8"
-                                 Tag="Friend username" />
+                        <Grid>
+                            <TextBox x:Name="FriendUserTextBox"
+                                     Height="36"
+                                     Padding="12,8"
+                                     Background="{StaticResource MutedBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderThickness="1"
+                                     BorderBrush="{StaticResource BorderBrush}"
+                                     TextChanged="FriendUserTextBox_TextChanged" />
+                            <TextBlock x:Name="FriendUserPlaceholder"
+                                       Text="Friend username"
+                                       Margin="12,0,0,0"
+                                       Foreground="{StaticResource MutedForegroundBrush}"
+                                       IsHitTestVisible="False"
+                                       VerticalAlignment="Center" />
+                        </Grid>
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -312,23 +344,43 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <TextBox x:Name="GroupNameTextBox"
-                                     Grid.Column="0"
-                                     Margin="0,0,6,0"
-                                     Style="{StaticResource SearchTextBoxStyle}"
-                                     Height="36"
-                                     Padding="12,8"
-                                     Tag="Group name" />
-                            <TextBox x:Name="GroupMemberTextBox"
-                                     Grid.Column="1"
-                                     Margin="6,0,0,0"
-                                     Style="{StaticResource SearchTextBoxStyle}"
-                                     Height="36"
-                                     Padding="12,8"
-                                     Tag="Member username" />
+                            <Grid Grid.Column="0" Margin="0,0,6,0">
+                                <TextBox x:Name="GroupNameTextBox"
+                                         Height="36"
+                                         Padding="12,8"
+                                         Background="{StaticResource MutedBrush}"
+                                         Foreground="{StaticResource ForegroundBrush}"
+                                         BorderThickness="1"
+                                         BorderBrush="{StaticResource BorderBrush}"
+                                         TextChanged="GroupNameTextBox_TextChanged" />
+                                <TextBlock x:Name="GroupNamePlaceholder"
+                                           Text="Group name"
+                                           Margin="12,0,0,0"
+                                           Foreground="{StaticResource MutedForegroundBrush}"
+                                           IsHitTestVisible="False"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid Grid.Column="1" Margin="6,0,0,0">
+                                <TextBox x:Name="GroupMemberTextBox"
+                                         Height="36"
+                                         Padding="12,8"
+                                         Background="{StaticResource MutedBrush}"
+                                         Foreground="{StaticResource ForegroundBrush}"
+                                         BorderThickness="1"
+                                         BorderBrush="{StaticResource BorderBrush}"
+                                         TextChanged="GroupMemberTextBox_TextChanged" />
+                                <TextBlock x:Name="GroupMemberPlaceholder"
+                                           Text="Member username"
+                                           Margin="12,0,0,0"
+                                           Foreground="{StaticResource MutedForegroundBrush}"
+                                           IsHitTestVisible="False"
+                                           VerticalAlignment="Center" />
+                            </Grid>
                         </Grid>
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
@@ -345,9 +397,19 @@
                                     Content="Add User" />
                             <Button x:Name="OpenGroupChatButton"
                                     Grid.Column="2"
-                                    Margin="6,0,0,0"
+                                    Margin="6,0,6,0"
                                     Click="OpenGroupChatButton_Click"
                                     Content="Open Group" />
+                            <Button x:Name="RemoveFromGroupButton"
+                                    Grid.Column="3"
+                                    Margin="6,0,6,0"
+                                    Click="RemoveFromGroupButton_Click"
+                                    Content="Remove" />
+                            <Button x:Name="RenameGroupButton"
+                                    Grid.Column="4"
+                                    Margin="6,0,0,0"
+                                    Click="RenameGroupButton_Click"
+                                    Content="Rename" />
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -392,16 +454,30 @@
                                        Text="Connect, then choose a friend or group"
                                        FontSize="12"
                                        Foreground="{StaticResource MutedForegroundBrush}" />
+                            <TextBlock x:Name="ChatHeaderMembers"
+                                       Margin="0,3,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource MutedForegroundBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       Visibility="Collapsed" />
                         </StackPanel>
                     </StackPanel>
                     <Border Grid.Column="1"
                             Background="{StaticResource MutedBrush}"
                             Padding="12,8"
                             CornerRadius="12">
-                        <TextBlock x:Name="StatusTextBlock"
-                                   Text="Disconnected."
-                                   Foreground="{StaticResource MutedForegroundBrush}"
-                                   TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="ClearChatButton"
+                                    Content="Clear"
+                                    Margin="0,0,10,0"
+                                    Padding="10,4"
+                                    Click="ClearChatButton_Click" />
+                            <TextBlock x:Name="StatusTextBlock"
+                                       Text="Disconnected."
+                                       Foreground="{StaticResource MutedForegroundBrush}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>
@@ -639,24 +715,66 @@
                                  Text="0" />
                     </Grid>
 
+                    <TextBlock x:Name="AttachmentPreviewTextBlock"
+                               Margin="0,0,0,8"
+                               FontSize="12"
+                               Foreground="{StaticResource MutedForegroundBrush}"
+                               Visibility="Collapsed" />
+
                     <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Button x:Name="BrowseImageButton"
+                        <Button x:Name="EmojiButton"
                                 Grid.Column="0"
                                 Style="{StaticResource IconButtonStyle}"
                                 Width="40"
                                 Height="40"
-                                ToolTip="Browse Image"
+                                ToolTip="Add emoji"
                                 Margin="0,0,12,0"
+                                Click="EmojiButton_Click">
+                            <TextBlock Text="☺"
+                                       FontSize="20"
+                                       Foreground="{StaticResource MutedForegroundBrush}" />
+                        </Button>
+                        <Popup x:Name="EmojiPopup"
+                               PlacementTarget="{Binding ElementName=EmojiButton}"
+                               Placement="Top"
+                               StaysOpen="False"
+                               AllowsTransparency="True">
+                            <Border Background="{StaticResource CardBrush}"
+                                    BorderBrush="{StaticResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="8"
+                                    Margin="0,0,0,8">
+                                <WrapPanel Width="220">
+                                    <Button Content="😀" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                    <Button Content="😂" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                    <Button Content="😍" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                    <Button Content="😎" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                    <Button Content="👍" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                    <Button Content="🙏" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                    <Button Content="🔥" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                    <Button Content="🎉" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                    <Button Content="❤️" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                    <Button Content="✅" FontSize="18" Width="36" Height="32" Click="EmojiPickerButton_Click" />
+                                </WrapPanel>
+                            </Border>
+                        </Popup>
+                        <Button x:Name="BrowseImageButton"
+                                Grid.Column="1"
+                                Style="{StaticResource IconButtonStyle}"
+                                Width="40"
+                                Height="40"
+                                ToolTip="Choose image"
+                                Margin="0,0,8,0"
                                 Click="BrowseImageButton_Click">
                             <Path Data="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                                   Stroke="{StaticResource MutedForegroundBrush}"
@@ -666,12 +784,28 @@
                                   Width="20"
                                   Height="20" />
                         </Button>
-                        <Button x:Name="BrowseVideoButton"
-                                Grid.Column="1"
+                        <Button x:Name="BrowseVoiceButton"
+                                Grid.Column="2"
                                 Style="{StaticResource IconButtonStyle}"
                                 Width="40"
                                 Height="40"
-                                ToolTip="Browse Video"
+                                ToolTip="Choose audio"
+                                Margin="0,0,8,0"
+                                Click="BrowseVoiceButton_Click">
+                            <Path Data="M9 18V5l12-2v13M9 9l12-2M6 18a3 3 0 106 0 3 3 0 00-6 0zm12-2a3 3 0 106 0 3 3 0 00-6 0z"
+                                  Stroke="{StaticResource MutedForegroundBrush}"
+                                  StrokeThickness="2"
+                                  Fill="Transparent"
+                                  Stretch="Uniform"
+                                  Width="20"
+                                  Height="20" />
+                        </Button>
+                        <Button x:Name="BrowseVideoButton"
+                                Grid.Column="3"
+                                Style="{StaticResource IconButtonStyle}"
+                                Width="40"
+                                Height="40"
+                                ToolTip="Choose video"
                                 Margin="0,0,12,0"
                                 Click="BrowseVideoButton_Click">
                             <Path Data="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
@@ -682,77 +816,43 @@
                                   Width="20"
                                   Height="20" />
                         </Button>
-                        <TextBox x:Name="MessageInputTextBox"
-                                 Grid.Column="2"
-                                 Style="{StaticResource MessageTextBoxStyle}"
-                                 Margin="0,0,12,0"
-                                 KeyDown="MessageInputTextBox_KeyDown"
-                                 Text=""
-                                 Tag="Type your message here..." />
+                        <Grid Grid.Column="4" Margin="0,0,12,0">
+                            <TextBox x:Name="MessageInputTextBox"
+                                     Height="48"
+                                     Padding="16,12"
+                                     FontSize="16"
+                                     Background="{StaticResource MutedBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderThickness="1"
+                                     BorderBrush="{StaticResource BorderBrush}"
+                                     KeyDown="MessageInputTextBox_KeyDown"
+                                     TextChanged="MessageInputTextBox_TextChanged"
+                                     Text="" />
+                            <TextBlock x:Name="MessageInputPlaceholder"
+                                       Text="Type your message here..."
+                                       Margin="16,0,0,0"
+                                       Foreground="{StaticResource MutedForegroundBrush}"
+                                       IsHitTestVisible="False"
+                                       VerticalAlignment="Center" />
+                        </Grid>
                         <Button x:Name="SendImageButton"
-                                Grid.Column="3"
-                                Style="{StaticResource IconButtonStyle}"
-                                Width="40"
-                                Height="40"
-                                ToolTip="Send Selected Attachment"
-                                Margin="0,0,12,0"
-                                Click="SendImageButton_Click">
-                            <Path Data="M12 5v14M5 12h14"
-                                  Stroke="{StaticResource MutedForegroundBrush}"
-                                  StrokeThickness="2"
-                                  Stretch="Uniform"
-                                  Width="20"
-                                  Height="20" />
-                        </Button>
-                        <Button x:Name="BrowseVoiceButton"
-                                Grid.Column="4"
-                                Style="{StaticResource IconButtonStyle}"
-                                Width="40"
-                                Height="40"
-                                ToolTip="Browse Audio"
-                                Margin="0,0,12,0"
-                                Click="BrowseVoiceButton_Click">
-                            <Path Data="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                  Stroke="{StaticResource MutedForegroundBrush}"
-                                  StrokeThickness="2"
-                                  Fill="Transparent"
-                                  Stretch="Uniform"
-                                  Width="20"
-                                  Height="20" />
-                        </Button>
-                        <Button x:Name="SendVoiceButton"
                                 Grid.Column="5"
                                 Style="{StaticResource IconButtonStyle}"
                                 Width="40"
                                 Height="40"
-                                ToolTip="Browse Voice"
+                                ToolTip="Send selected attachment"
                                 Margin="0,0,12,0"
-                                Click="SendVoiceButton_Click">
-                            <Path Data="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                                Click="SendImageButton_Click">
+                            <Path Data="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
                                   Stroke="{StaticResource MutedForegroundBrush}"
                                   StrokeThickness="2"
                                   Fill="Transparent"
-                                  Stretch="Uniform"
-                                  Width="20"
-                                  Height="20" />
-                        </Button>
-                        <Button x:Name="SendVideoButton"
-                                Grid.Column="6"
-                                Style="{StaticResource IconButtonStyle}"
-                                Width="40"
-                                Height="40"
-                                ToolTip="Send Selected Attachment"
-                                Margin="0,0,12,0"
-                                Click="SendVideoButton_Click">
-                            <Path Data="M12 5v14M5 12h14"
-                                  Stroke="{StaticResource MutedForegroundBrush}"
-                                  StrokeThickness="2"
                                   Stretch="Uniform"
                                   Width="20"
                                   Height="20" />
                         </Button>
                         <Button x:Name="SendButton"
-                                Grid.Column="7"
+                                Grid.Column="6"
                                 Style="{StaticResource SendButtonStyle}"
                                 Click="SendButton_Click">
                             <StackPanel Orientation="Horizontal">

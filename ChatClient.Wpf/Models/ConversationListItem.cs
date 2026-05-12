@@ -10,6 +10,7 @@ public sealed class ConversationListItem : INotifyPropertyChanged
     private Brush statusBrush = Brushes.Transparent;
     private string statusText = string.Empty;
     private bool isPinned;
+    private int unreadCount;
 
     public string Name { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
@@ -46,6 +47,21 @@ public sealed class ConversationListItem : INotifyPropertyChanged
         get => isPinned;
         set { isPinned = value; OnPropertyChanged(nameof(IsPinned)); }
     }
+
+    public int UnreadCount
+    {
+        get => unreadCount;
+        set
+        {
+            unreadCount = value;
+            OnPropertyChanged(nameof(UnreadCount));
+            OnPropertyChanged(nameof(HasUnread));
+            OnPropertyChanged(nameof(UnreadLabel));
+        }
+    }
+
+    public bool HasUnread => unreadCount > 0;
+    public string UnreadLabel => unreadCount > 99 ? "99+" : unreadCount.ToString();
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
