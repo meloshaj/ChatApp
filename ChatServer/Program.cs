@@ -26,14 +26,20 @@ class Program
     private static RsaKeyPair serverIdentityKeys = null!;
     private static readonly AuthenticationRateLimiter authRateLimiter = new();
 
-    static void Main()
+    static void Main(string[] args)
     {
         InitializeServicesAsync().GetAwaiter().GetResult();
 
-        TcpListener server = new TcpListener(IPAddress.Loopback, 13000);
+        int port = ParsePort(args);
+        TcpListener server = new TcpListener(IPAddress.Any, port);
         server.Start();
 
-        Console.WriteLine("Enhanced Server started on port 13000...");
+        Console.WriteLine($"Enhanced Server started on port {port}.");
+        Console.WriteLine("Clients on other devices can connect using one of these server addresses:");
+        foreach (string address in GetLocalIPv4Addresses())
+        {
+            Console.WriteLine($"  {address}:{port}");
+        }
         Console.WriteLine("Features: Authentication, Message History, Typing Indicators, User Presence");
         Console.WriteLine();
 
@@ -42,6 +48,31 @@ class Program
             TcpClient client = server.AcceptTcpClient();
             Task.Run(() => HandleClientAsync(client));
         }
+    }
+
+    static int ParsePort(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            return 13000;
+        }
+
+        if (int.TryParse(args[0], out int port) && port > 0 && port <= 65535)
+        {
+            return port;
+        }
+
+        Console.WriteLine($"Invalid port '{args[0]}'. Using default port 13000.");
+        return 13000;
+    }
+
+    static IEnumerable<string> GetLocalIPv4Addresses()
+    {
+        string hostName = Dns.GetHostName();
+        return Dns.GetHostAddresses(hostName)
+            .Where(address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
+            .Select(address => address.ToString())
+            .DefaultIfEmpty("127.0.0.1");
     }
 
     static async Task InitializeServicesAsync()

@@ -32,6 +32,13 @@ bld/
 [Oo]ut/
 [Ll]og/
 [Ll]ogs/
+dist/
+verify_build/
+verify_bin/
+verify_obj/
+temp_verify/
+temp_sln_test/
+tmp_*.sln
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
