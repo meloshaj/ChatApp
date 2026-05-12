@@ -484,12 +484,12 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Grid Margin="0,0,0,16">
-                                 <Border Background="{Binding MessageBackground}"
-                                         CornerRadius="{Binding CornerRadius}"
-                                         Padding="16,12"
-                                         MaxWidth="600"
-                                         HorizontalAlignment="{Binding Alignment}"
-                                         ContextMenuOpening="MessageBubble_ContextMenuOpening">
+                                <Border Background="{Binding MessageBackground}"
+                                        CornerRadius="{Binding CornerRadius}"
+                                        Padding="16,12"
+                                        MaxWidth="600"
+                                        HorizontalAlignment="{Binding Alignment}"
+                                        ContextMenuOpening="MessageBubble_ContextMenuOpening">
                                     <Border.ContextMenu>
                                         <ContextMenu>
                                             <MenuItem Header="Edit"
@@ -511,9 +511,9 @@
                                                       DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                         </ContextMenu>
                                     </Border.ContextMenu>
-                                     <Border.Effect>
-                                         <DropShadowEffect BlurRadius="8"
-                                                           ShadowDepth="2"
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="8"
+                                                          ShadowDepth="2"
                                                           Opacity="0.1"
                                                           Color="Black" />
                                     </Border.Effect>

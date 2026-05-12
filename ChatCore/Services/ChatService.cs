@@ -216,7 +216,7 @@ namespace ChatCore.Services
                 if (stream == null) return;
 
                 var networkMessage = ProtectForUser(user, BuildNetworkMessage(user, message));
-                await networkManager.SendMessage(stream, networkMessage);
+                await networkManager.SendMessage(stream, ProtectForUser(user, networkMessage));
             }
             catch
             {
