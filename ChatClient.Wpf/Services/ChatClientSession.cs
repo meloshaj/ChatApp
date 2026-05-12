@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
 using ChatClient.Wpf.Models;
+using ChatCore.Security;
 using Microsoft.Win32;
 
 namespace ChatClient.Wpf.Services;
@@ -25,9 +27,11 @@ public sealed class ChatClientSession
     private readonly Dictionary<string, IReadOnlyList<string>> groupMembers = new(StringComparer.OrdinalIgnoreCase);
     private readonly ObservableCollection<ChatMessage> visibleMessages = [];
     private readonly ObservableCollection<ConversationListItem> conversations = [];
+    private readonly TrustedServerStore trustedServerStore = new();
     private TcpClient? client;
     private NetworkStream? stream;
     private readonly NetworkManager networkManager = new();
+    private SecureTransportSession? secureSession;
     private CancellationTokenSource? receiveCancellation;
     private bool isConnected;
     private string? currentUsername;
@@ -38,6 +42,8 @@ public sealed class ChatClientSession
     private AttachmentKind pendingAttachmentKind;
     private string typingStatusText = string.Empty;
     private bool lastTypingState;
+    private string connectedHost = string.Empty;
+    private string connectedPort = string.Empty;
 
     public ObservableCollection<ChatMessage> VisibleMessages => visibleMessages;
     public ObservableCollection<ConversationListItem> Conversations => conversations;
@@ -52,17 +58,29 @@ public sealed class ChatClientSession
     public event Action? ConversationCollectionChanged;
     public event Action? ConversationSelectionChanged;
 
-    public void SetAuthenticatedConnection(TcpClient authenticatedClient, NetworkStream authenticatedStream, string username)
+    public async void SetAuthenticatedConnection(TcpClient authenticatedClient, NetworkStream authenticatedStream, string username, string host, string port)
     {
         client = authenticatedClient;
         stream = authenticatedStream;
         currentUsername = username;
+        connectedHost = host;
+        connectedPort = port;
         isConnected = true;
-        receiveCancellation = new CancellationTokenSource();
-        
-        _ = Task.Run(() => ReceiveLoopAsync(receiveCancellation.Token));
-        OnStatusChanged($"Authenticated as {username}");
-        _ = RefreshListsAsync();
+
+        try
+        {
+            await EstablishSecureSessionAsync();
+            receiveCancellation = new CancellationTokenSource();
+
+            _ = Task.Run(() => ReceiveLoopAsync(receiveCancellation.Token));
+            OnStatusChanged($"Authenticated as {username} with RSA/ECDH/AES security.");
+            _ = RefreshListsAsync();
+        }
+        catch (Exception ex)
+        {
+            OnStatusChanged("Secure handshake failed: " + ex.Message);
+            await DisconnectAsync();
+        }
     }
 
     public async Task ConnectAsync(string host, string portText, string username)
@@ -84,6 +102,8 @@ public sealed class ChatClientSession
             client = new TcpClient();
             await client.ConnectAsync(host.Trim(), port);
             stream = client.GetStream();
+            connectedHost = host.Trim();
+            connectedPort = portText.Trim();
             receiveCancellation = new CancellationTokenSource();
             isConnected = true;
             _ = Task.Run(() => ReceiveLoopAsync(receiveCancellation.Token));
@@ -591,7 +611,7 @@ public sealed class ChatClientSession
 
         try
         {
-            await networkManager.SendMessage(stream, message);
+            await networkManager.SendMessage(stream, ProtectOutgoing(message));
             return true;
         }
         catch (Exception ex)
@@ -600,6 +620,80 @@ public sealed class ChatClientSession
             await DisconnectAsync();
             return false;
         }
+    }
+
+    private async Task EstablishSecureSessionAsync()
+    {
+        if (stream == null)
+        {
+            throw new InvalidOperationException("Connection stream is not available.");
+        }
+
+        NetworkMessage? prompt = await networkManager.ReceiveMessage(stream);
+        if (prompt == null || !string.Equals(prompt.Type, "crypto", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Server did not start the secure handshake.");
+        }
+
+        secureSession = new SecureTransportSession();
+        CryptoHandshake serverHandshake = new(prompt.RsaPublicKey, prompt.EcdhPublicKey, prompt.Signature);
+        if (!trustedServerStore.IsTrustedOrTrustFirstUse(connectedHost, connectedPort, serverHandshake.RsaPublicKey))
+        {
+            throw new InvalidOperationException("Server RSA identity changed. Refusing connection.");
+        }
+
+        if (!secureSession.CompleteHandshake(serverHandshake, serverHandshake.RsaPublicKey))
+        {
+            throw new InvalidOperationException("Server secure handshake signature was invalid.");
+        }
+
+        CryptoHandshake clientHandshake = secureSession.CreateHandshake();
+        await networkManager.SendMessage(stream, new NetworkMessage
+        {
+            Sender = currentUsername ?? "Me",
+            Type = "crypto",
+            Text = "CRYPTO_READY|RSA_ECDH_SHA256_AES",
+            RsaPublicKey = clientHandshake.RsaPublicKey,
+            EcdhPublicKey = clientHandshake.EcdhPublicKey,
+            Signature = clientHandshake.Signature,
+            Timestamp = DateTime.UtcNow
+        });
+    }
+
+    private NetworkMessage ProtectOutgoing(NetworkMessage message)
+    {
+        if (secureSession?.HasSharedKey != true || string.Equals(message.Type, "crypto", StringComparison.OrdinalIgnoreCase))
+        {
+            return message;
+        }
+
+        EncryptedMessage encrypted = secureSession.Protect(JsonSerializer.Serialize(message));
+        return new NetworkMessage
+        {
+            Sender = message.Sender,
+            MessageId = message.MessageId,
+            Type = "secure",
+            CipherText = encrypted.CipherText,
+            Iv = encrypted.Iv,
+            Timestamp = DateTime.UtcNow
+        };
+    }
+
+    private NetworkMessage UnprotectIncoming(NetworkMessage incoming)
+    {
+        if (!string.Equals(incoming.Type, "secure", StringComparison.OrdinalIgnoreCase))
+        {
+            return incoming;
+        }
+
+        if (secureSession?.HasSharedKey != true)
+        {
+            throw new InvalidOperationException("Received a secure message before the secure session was ready.");
+        }
+
+        string json = secureSession.Unprotect(new EncryptedMessage(incoming.CipherText, incoming.Iv));
+        return JsonSerializer.Deserialize<NetworkMessage>(json)
+            ?? throw new InvalidOperationException("Failed to deserialize secure server message.");
     }
 
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
@@ -614,6 +708,7 @@ public sealed class ChatClientSession
                     break;
                 }
 
+                incoming = UnprotectIncoming(incoming);
                 await Application.Current.Dispatcher.InvokeAsync(() => HandleIncomingMessage(incoming));
             }
         }

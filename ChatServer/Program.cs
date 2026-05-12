@@ -8,6 +8,7 @@ using ChatCore.Decorators;
 using ChatCore.States;
 using ChatCore.Observers;
 using ChatCore.Persistence;
+using ChatCore.Security;
 
 class Program
 {
@@ -22,6 +23,8 @@ class Program
     private static FriendService friendService = null!;
     private static ConversationService conversationService = null!;
     private static CommandService commandService = null!;
+    private static RsaKeyPair serverIdentityKeys = null!;
+    private static readonly AuthenticationRateLimiter authRateLimiter = new();
 
     static void Main()
     {
@@ -47,6 +50,7 @@ class Program
         string databasePath = Path.Combine(dataDirectory, "chatapp.db");
         SqliteDatabase database = new(databasePath);
         await database.InitializeAsync();
+        serverIdentityKeys = new ServerIdentityStore(dataDirectory).LoadOrCreate();
 
         // Initialize repositories
         userRepository = new SqliteUserRepository(database);
@@ -99,13 +103,14 @@ class Program
         try
         {
             // Authentication phase
-            user = await AuthenticateClientAsync(stream);
+            user = await AuthenticateClientAsync(client, stream);
             if (user == null)
             {
                 client.Close();
                 return;
             }
 
+            user.SecureSession = await EstablishSecureSessionAsync(stream);
             user.Client = client;
             user.SetState(new OnlineState());
             await userRepository.UpdateAsync(user);
@@ -128,6 +133,7 @@ class Program
                     break;
                 }
 
+                incoming = UnprotectIncoming(user, incoming);
                 await HandleIncomingMessageAsync(user, incoming);
             }
         }
@@ -149,7 +155,7 @@ class Program
         }
     }
 
-    static async Task<User?> AuthenticateClientAsync(NetworkStream stream)
+    static async Task<User?> AuthenticateClientAsync(TcpClient client, NetworkStream stream)
     {
         // Send authentication prompt
         var authPrompt = new NetworkMessage
@@ -177,33 +183,28 @@ class Program
         string command = parts[0].ToUpperInvariant();
         string username = parts[1];
         string password = parts[2];
+        IPEndPoint remoteEndpoint = client.Client.RemoteEndPoint as IPEndPoint ?? new IPEndPoint(IPAddress.None, 0);
+
+        if (authRateLimiter.IsBlocked(remoteEndpoint, username, out TimeSpan retryAfter))
+        {
+            await SendAuthFailedAsync(stream, $"Too many failed attempts. Try again in {Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds))} seconds.");
+            return null;
+        }
 
         if (command == "REGISTER")
         {
             var result = await authService.RegisterAsync(username, password);
             if (result.Success && result.UserId != null)
             {
+                authRateLimiter.RecordSuccess(remoteEndpoint, username);
                 var user = await userRepository.GetByIdAsync(result.UserId);
-                var successMsg = new NetworkMessage
-                {
-                    Sender = "System",
-                    Type = "auth",
-                    Text = $"[System] AUTH_SUCCESS|{result.SessionToken}",
-                    Timestamp = DateTime.UtcNow
-                };
-                await networkManager.SendMessage(stream, successMsg);
+                await SendAuthSuccessAsync(stream);
                 return user;
             }
             else
             {
-                var errorMsg = new NetworkMessage
-                {
-                    Sender = "System",
-                    Type = "auth",
-                    Text = $"[System] AUTH_FAILED|{result.Error}",
-                    Timestamp = DateTime.UtcNow
-                };
-                await networkManager.SendMessage(stream, errorMsg);
+                authRateLimiter.RecordFailure(remoteEndpoint, username);
+                await SendAuthFailedAsync(stream, result.Error ?? "Authentication failed.");
                 return null;
             }
         }
@@ -212,32 +213,90 @@ class Program
             var result = await authService.LoginAsync(username, password);
             if (result.Success && result.UserId != null)
             {
+                authRateLimiter.RecordSuccess(remoteEndpoint, username);
                 var user = await userRepository.GetByIdAsync(result.UserId);
-                var successMsg = new NetworkMessage
-                {
-                    Sender = "System",
-                    Type = "auth",
-                    Text = $"[System] AUTH_SUCCESS|{result.SessionToken}",
-                    Timestamp = DateTime.UtcNow
-                };
-                await networkManager.SendMessage(stream, successMsg);
+                await SendAuthSuccessAsync(stream);
                 return user;
             }
             else
             {
-                var errorMsg = new NetworkMessage
-                {
-                    Sender = "System",
-                    Type = "auth",
-                    Text = $"[System] AUTH_FAILED|{result.Error}",
-                    Timestamp = DateTime.UtcNow
-                };
-                await networkManager.SendMessage(stream, errorMsg);
+                authRateLimiter.RecordFailure(remoteEndpoint, username);
+                await SendAuthFailedAsync(stream, result.Error ?? "Authentication failed.");
                 return null;
             }
         }
 
         return null;
+    }
+
+    static async Task SendAuthSuccessAsync(NetworkStream stream)
+    {
+        await networkManager.SendMessage(stream, new NetworkMessage
+        {
+            Sender = "System",
+            Type = "auth",
+            Text = "[System] AUTH_SUCCESS",
+            Timestamp = DateTime.UtcNow
+        });
+    }
+
+    static async Task SendAuthFailedAsync(NetworkStream stream, string error)
+    {
+        await networkManager.SendMessage(stream, new NetworkMessage
+        {
+            Sender = "System",
+            Type = "auth",
+            Text = $"[System] AUTH_FAILED|{error}",
+            Timestamp = DateTime.UtcNow
+        });
+    }
+
+    static async Task<SecureTransportSession> EstablishSecureSessionAsync(NetworkStream stream)
+    {
+        SecureTransportSession secureSession = new(serverIdentityKeys);
+        CryptoHandshake serverHandshake = secureSession.CreateHandshake();
+
+        await networkManager.SendMessage(stream, new NetworkMessage
+        {
+            Sender = "System",
+            Type = "crypto",
+            Text = "[System] CRYPTO_REQUIRED|RSA_ECDH_SHA256_AES",
+            RsaPublicKey = serverHandshake.RsaPublicKey,
+            EcdhPublicKey = serverHandshake.EcdhPublicKey,
+            Signature = serverHandshake.Signature,
+            Timestamp = DateTime.UtcNow
+        });
+
+        NetworkMessage? response = await networkManager.ReceiveMessage(stream);
+        if (response == null || !string.Equals(response.Type, "crypto", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Client did not complete secure handshake.");
+        }
+
+        CryptoHandshake clientHandshake = new(response.RsaPublicKey, response.EcdhPublicKey, response.Signature);
+        if (!secureSession.CompleteHandshake(clientHandshake))
+        {
+            throw new InvalidOperationException("Client secure handshake signature was invalid.");
+        }
+
+        return secureSession;
+    }
+
+    static NetworkMessage UnprotectIncoming(User user, NetworkMessage incoming)
+    {
+        if (!string.Equals(incoming.Type, "secure", StringComparison.OrdinalIgnoreCase))
+        {
+            return incoming;
+        }
+
+        if (user.SecureSession?.HasSharedKey != true)
+        {
+            throw new InvalidOperationException("Received a secure message before the secure session was ready.");
+        }
+
+        string json = user.SecureSession.Unprotect(new EncryptedMessage(incoming.CipherText, incoming.Iv));
+        return System.Text.Json.JsonSerializer.Deserialize<NetworkMessage>(json)
+            ?? throw new InvalidOperationException("Failed to deserialize secure client message.");
     }
 
     static async Task HandleIncomingMessageAsync(User user, NetworkMessage incoming)
@@ -340,6 +399,19 @@ class Program
                         Text = $"{user.Username}|{status}",
                         Timestamp = DateTime.UtcNow
                     };
+                    if (onlineUser.SecureSession?.HasSharedKey == true)
+                    {
+                        EncryptedMessage encrypted = onlineUser.SecureSession.Protect(System.Text.Json.JsonSerializer.Serialize(presenceMsg));
+                        presenceMsg = new NetworkMessage
+                        {
+                            Sender = presenceMsg.Sender,
+                            Type = "secure",
+                            CipherText = encrypted.CipherText,
+                            Iv = encrypted.Iv,
+                            Timestamp = DateTime.UtcNow
+                        };
+                    }
+
                     await networkManager.SendMessage(stream, presenceMsg);
                 }
             }

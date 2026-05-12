@@ -14,4 +14,8 @@
     </Resource>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ChatCore\ChatCore.csproj" />
+  </ItemGroup>
+
 </Project>

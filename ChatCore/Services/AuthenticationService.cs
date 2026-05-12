@@ -2,118 +2,75 @@ using System.Security.Cryptography;
 using System.Text;
 using ChatCore.Interfaces;
 using ChatCore.Models;
-using ChatCore.Security;
 
 namespace ChatCore.Services
 {
     public class AuthenticationService
     {
         private readonly IUserRepository userRepository;
-        private readonly RsaService rsaService = new();
-        private readonly Dictionary<string, string> activeSessions = new();
-        private readonly object sessionLock = new();
 
         public AuthenticationService(IUserRepository userRepository)
         {
             this.userRepository = userRepository;
         }
 
-        public async Task<(bool Success, string? UserId, string? SessionToken, string? Error)> RegisterAsync(
+        public async Task<(bool Success, string? UserId, string? Error)> RegisterAsync(
             string username, string password)
         {
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
-                return (false, null, null, "Username and password are required.");
+                return (false, null, "Username and password are required.");
             }
 
             if (username.Contains(' '))
             {
-                return (false, null, null, "Username cannot contain spaces.");
+                return (false, null, "Username cannot contain spaces.");
             }
 
             if (password.Length < 6)
             {
-                return (false, null, null, "Password must be at least 6 characters.");
+                return (false, null, "Password must be at least 6 characters.");
             }
 
             var existingUser = await userRepository.GetByUsernameAsync(username);
             if (existingUser != null)
             {
-                return (false, null, null, "Username already exists.");
+                return (false, null, "Username already exists.");
             }
 
-            RsaKeyPair rsaKeys = rsaService.GenerateKeyPair();
             var user = new User
             {
                 Id = Guid.NewGuid().ToString(),
                 Username = username,
                 PasswordHash = HashPassword(password),
-                RsaPublicKey = rsaKeys.PublicKey,
-                RsaPrivateKey = rsaKeys.PrivateKey,
                 Status = UserStatus.Offline
             };
 
             await userRepository.AddAsync(user);
 
-            var sessionToken = CreateSession(user.Id);
-            return (true, user.Id, sessionToken, null);
+            return (true, user.Id, null);
         }
 
-        public async Task<(bool Success, string? UserId, string? SessionToken, string? Error)> LoginAsync(
+        public async Task<(bool Success, string? UserId, string? Error)> LoginAsync(
             string username, string password)
         {
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
-                return (false, null, null, "Username and password are required.");
+                return (false, null, "Username and password are required.");
             }
 
             var user = await userRepository.GetByUsernameAsync(username);
             if (user == null)
             {
-                return (false, null, null, "Invalid username or password.");
+                return (false, null, "Invalid username or password.");
             }
 
             if (!VerifyPassword(password, user.PasswordHash))
             {
-                return (false, null, null, "Invalid username or password.");
+                return (false, null, "Invalid username or password.");
             }
 
-            await EnsureUserHasRsaKeysAsync(user);
-
-            var sessionToken = CreateSession(user.Id);
-            return (true, user.Id, sessionToken, null);
-        }
-
-        public async Task<User?> ValidateSessionAsync(string sessionToken)
-        {
-            string? userId;
-            lock (sessionLock)
-            {
-                if (!activeSessions.TryGetValue(sessionToken, out userId))
-                {
-                    return null;
-                }
-            }
-
-            return await userRepository.GetByIdAsync(userId);
-        }
-
-        public void Logout(string sessionToken)
-        {
-            lock (sessionLock)
-            {
-                activeSessions.Remove(sessionToken);
-            }
-        }
-
-        private string CreateSession(string userId)
-        {
-            var sessionToken = Guid.NewGuid().ToString();
-            lock (sessionLock)
-            {
-                activeSessions[sessionToken] = userId;
-            }
-            return sessionToken;
+            return (true, user.Id, null);
         }
 
         private static string HashPassword(string password)
@@ -130,18 +87,5 @@ namespace ChatCore.Services
             return computedHash == hash;
         }
 
-        private async Task EnsureUserHasRsaKeysAsync(User user)
-        {
-            if (!string.IsNullOrWhiteSpace(user.RsaPublicKey) &&
-                !string.IsNullOrWhiteSpace(user.RsaPrivateKey))
-            {
-                return;
-            }
-
-            RsaKeyPair rsaKeys = rsaService.GenerateKeyPair();
-            user.RsaPublicKey = rsaKeys.PublicKey;
-            user.RsaPrivateKey = rsaKeys.PrivateKey;
-            await userRepository.UpdateAsync(user);
-        }
     }
 }

@@ -6,9 +6,16 @@ namespace ChatCore.Services
 {
     public sealed class NetworkManager
     {
+        private const int MaxMessageBytes = 32 * 1024 * 1024;
+
         public async Task SendMessage(NetworkStream stream, NetworkMessage message, CancellationToken cancellationToken = default)
         {
             byte[] data = SerializeMessage(message);
+            if (data.Length > MaxMessageBytes)
+            {
+                throw new InvalidOperationException($"Message payload exceeds the {MaxMessageBytes / (1024 * 1024)} MB limit.");
+            }
+
             byte[] lengthPrefix = BitConverter.GetBytes(data.Length);
             await stream.WriteAsync(lengthPrefix, cancellationToken);
             await stream.WriteAsync(data, cancellationToken);
@@ -27,6 +34,11 @@ namespace ChatCore.Services
             if (messageLength <= 0)
             {
                 return null;
+            }
+
+            if (messageLength > MaxMessageBytes)
+            {
+                throw new InvalidOperationException($"Incoming message exceeds the {MaxMessageBytes / (1024 * 1024)} MB limit.");
             }
 
             byte[]? payload = await ReadExact(stream, messageLength, cancellationToken);

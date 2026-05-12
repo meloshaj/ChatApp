@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using ChatCore.Security;
 using ChatCore.States;
 
 namespace ChatCore.Models
@@ -19,6 +20,7 @@ namespace ChatCore.Models
 
         private IUserState currentState = new OfflineState();
         public TcpClient? Client { get; set; }
+        public SecureTransportSession? SecureSession { get; set; }
 
         public void SetState(IUserState state)
         {

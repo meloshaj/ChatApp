@@ -244,7 +244,7 @@ namespace ChatCore.Repositories
             command.Parameters.AddWithValue("$username", entity.Username);
             command.Parameters.AddWithValue("$passwordHash", entity.PasswordHash);
             command.Parameters.AddWithValue("$rsaPublicKey", entity.RsaPublicKey);
-            command.Parameters.AddWithValue("$rsaPrivateKey", entity.RsaPrivateKey);
+            command.Parameters.AddWithValue("$rsaPrivateKey", string.Empty);
             command.Parameters.AddWithValue("$activeConversationId", (object?)entity.ActiveConversationId ?? DBNull.Value);
             command.Parameters.AddWithValue("$status", (int)entity.Status);
             command.Parameters.AddWithValue("$lastSeen", entity.LastSeen.ToString("O"));
@@ -284,7 +284,7 @@ namespace ChatCore.Repositories
                 Username = reader.GetString(1),
                 PasswordHash = reader.GetString(2),
                 RsaPublicKey = reader.GetString(3),
-                RsaPrivateKey = reader.GetString(4),
+                RsaPrivateKey = string.Empty,
                 ActiveConversationId = reader.IsDBNull(5) ? null : reader.GetString(5),
                 Status = (UserStatus)reader.GetInt32(6),
                 LastSeen = DateTime.Parse(reader.GetString(7), null, System.Globalization.DateTimeStyles.RoundtripKind),
@@ -313,6 +313,7 @@ namespace ChatCore.Repositories
                 if (runtimeUsers.TryGetValue(user.Id, out RuntimeUserState? runtimeState))
                 {
                     user.Client = runtimeState.Client;
+                    user.SecureSession = runtimeState.SecureSession;
                     user.SetState(runtimeState.State);
                     user.Status = runtimeState.State.Status;
                     return;
@@ -332,7 +333,7 @@ namespace ChatCore.Repositories
                     return;
                 }
 
-                runtimeUsers[user.Id] = new RuntimeUserState(user.Client, user.GetState());
+                runtimeUsers[user.Id] = new RuntimeUserState(user.Client, user.SecureSession, user.GetState());
             }
         }
 
@@ -347,6 +348,9 @@ namespace ChatCore.Repositories
             };
         }
 
-        private sealed record RuntimeUserState(TcpClient Client, ChatCore.States.IUserState State);
+        private sealed record RuntimeUserState(
+            TcpClient Client,
+            ChatCore.Security.SecureTransportSession? SecureSession,
+            ChatCore.States.IUserState State);
     }
 }

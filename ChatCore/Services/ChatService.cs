@@ -3,6 +3,7 @@ using ChatCore.Models;
 using ChatCore.Observers;
 using ChatCore.Factories;
 using ChatCore.Commands;
+using ChatCore.Security;
 
 namespace ChatCore.Services
 {
@@ -196,7 +197,7 @@ namespace ChatCore.Services
                 var stream = user.GetStream();
                 if (stream == null) return;
 
-                var networkMessage = BuildNetworkMessage(user, message);
+                var networkMessage = ProtectForUser(user, BuildNetworkMessage(user, message));
                 await networkManager.SendMessage(stream, networkMessage);
             }
             catch
@@ -228,7 +229,7 @@ namespace ChatCore.Services
                     Timestamp = notification.Timestamp
                 };
 
-                await networkManager.SendMessage(stream, networkMessage);
+                await networkManager.SendMessage(stream, ProtectForUser(user, networkMessage));
             }
             catch
             {
@@ -303,6 +304,25 @@ namespace ChatCore.Services
                 Type = "text",
                 Text = body,
                 Timestamp = message.Timestamp
+            };
+        }
+
+        private static NetworkMessage ProtectForUser(User user, NetworkMessage message)
+        {
+            if (user.SecureSession?.HasSharedKey != true)
+            {
+                return message;
+            }
+
+            EncryptedMessage encrypted = user.SecureSession.Protect(System.Text.Json.JsonSerializer.Serialize(message));
+            return new NetworkMessage
+            {
+                Sender = message.Sender,
+                MessageId = message.MessageId,
+                Type = "secure",
+                CipherText = encrypted.CipherText,
+                Iv = encrypted.Iv,
+                Timestamp = DateTime.UtcNow
             };
         }
 

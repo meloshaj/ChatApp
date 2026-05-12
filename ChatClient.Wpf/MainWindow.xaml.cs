@@ -32,7 +32,7 @@ public partial class MainWindow : Window
         notificationTimer.Tick += HideMessageNotification;
         
         // Set authenticated connection
-        session.SetAuthenticatedConnection(authClient.GetClient()!, authClient.GetStream()!, username);
+        session.SetAuthenticatedConnection(authClient.GetClient()!, authClient.GetStream()!, username, authClient.LastHost, authClient.LastPort);
         
         RefreshConversationList();
         RefreshHeader();

@@ -9,7 +9,8 @@ public class AuthenticationClient
     private TcpClient? client;
     private NetworkStream? stream;
     private readonly NetworkManager networkManager = new();
-    public string? SessionToken { get; private set; }
+    public string LastHost { get; private set; } = string.Empty;
+    public string LastPort { get; private set; } = string.Empty;
 
     public async Task<AuthResult> AuthenticateAsync(string host, string port, string username, string password, bool isRegister)
     {
@@ -20,8 +21,10 @@ public class AuthenticationClient
 
         try
         {
+            LastHost = host.Trim();
+            LastPort = port.Trim();
             client = new TcpClient();
-            await client.ConnectAsync(host, portNumber);
+            await client.ConnectAsync(LastHost, portNumber);
             stream = client.GetStream();
 
             // Wait for auth prompt
@@ -52,13 +55,6 @@ public class AuthenticationClient
 
             if (response.Text.Contains("AUTH_SUCCESS"))
             {
-                // Extract session token
-                var parts = response.Text.Split('|');
-                if (parts.Length >= 2)
-                {
-                    SessionToken = parts[1];
-                }
-
                 return new AuthResult 
                 { 
                     Success = true, 

@@ -98,6 +98,7 @@ namespace ChatCore.Persistence
 
             await AddColumnIfMissingAsync(connection, "users", "rsa_public_key", "TEXT NOT NULL DEFAULT ''");
             await AddColumnIfMissingAsync(connection, "users", "rsa_private_key", "TEXT NOT NULL DEFAULT ''");
+            await ClearStoredUserPrivateKeysAsync(connection);
         }
 
         public SqliteConnection CreateConnection() => new(connectionString);
@@ -123,6 +124,17 @@ namespace ChatCore.Persistence
             await using var alterCommand = connection.CreateCommand();
             alterCommand.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
             await alterCommand.ExecuteNonQueryAsync();
+        }
+
+        private static async Task ClearStoredUserPrivateKeysAsync(SqliteConnection connection)
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE users
+                SET rsa_private_key = ''
+                WHERE rsa_private_key <> '';
+                """;
+            await command.ExecuteNonQueryAsync();
         }
     }
 }
