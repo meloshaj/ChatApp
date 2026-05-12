@@ -96,6 +96,11 @@ namespace ChatCore.Services
 
             foreach (var message in messages)
             {
+                if (message.IsDeleted)
+                {
+                    continue;
+                }
+
                 await SendToUserAsync(recipient, message);
                 replayedCount++;
             }
@@ -147,6 +152,19 @@ namespace ChatCore.Services
             var commandHistory = GetCommandHistory(userId);
             var deleteCommand = new DeleteMessageCommand(messageRepository, messageId);
             await commandHistory.ExecuteAsync(deleteCommand);
+
+            var conversation = await conversationRepository.GetByIdAsync(message.ConversationId);
+            if (conversation != null)
+            {
+                foreach (var participantId in conversation.ParticipantIds)
+                {
+                    var user = await userRepository.GetByIdAsync(participantId);
+                    if (user != null && user.IsOnline())
+                    {
+                        await SendDeleteNotificationAsync(user, messageId);
+                    }
+                }
+            }
 
             return true;
         }
@@ -234,6 +252,30 @@ namespace ChatCore.Services
             catch
             {
                 // Ignore typing notification failures
+            }
+        }
+
+        private async Task SendDeleteNotificationAsync(User user, string messageId)
+        {
+            try
+            {
+                var stream = user.GetStream();
+                if (stream == null) return;
+
+                var networkMessage = new NetworkMessage
+                {
+                    Sender = "System",
+                    MessageId = messageId,
+                    Type = "delete",
+                    Text = "MESSAGE_DELETED",
+                    Timestamp = DateTime.UtcNow
+                };
+
+                await networkManager.SendMessage(stream, networkMessage);
+            }
+            catch
+            {
+                // Ignore delete notification failures
             }
         }
 

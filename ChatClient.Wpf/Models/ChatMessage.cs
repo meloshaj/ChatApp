@@ -24,6 +24,8 @@ public sealed class ChatMessage
     public bool HasAudio => !string.IsNullOrWhiteSpace(AudioPath);
     public bool HasVideo => !string.IsNullOrWhiteSpace(VideoPath);
     public bool HasText => !string.IsNullOrWhiteSpace(Text);
+    public bool CanEdit => IsSent && HasText && !string.IsNullOrWhiteSpace(MessageId);
+    public bool CanDelete => IsSent && !string.IsNullOrWhiteSpace(MessageId);
 
     public HorizontalAlignment Alignment => IsSent ? HorizontalAlignment.Right : HorizontalAlignment.Left;
     public Brush MessageBackground => IsSent ? BrushFrom("#3B82F6") : BrushFrom("#ECECF0");

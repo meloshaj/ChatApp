@@ -12,6 +12,8 @@ namespace ChatClient.Wpf.Services;
 
 public sealed class ChatClientSession
 {
+    private const string EmptyConversationPreview = "Tap to text";
+
     public enum AttachmentKind
     {
         None,
@@ -310,6 +312,35 @@ public sealed class ChatClientSession
 
         await SendRawAsync(trimmed);
         await SendTypingStateAsync(false);
+    }
+
+    public async Task EditMessageAsync(ChatMessage message, string newText)
+    {
+        if (message == null || !message.CanEdit)
+        {
+            OnStatusChanged("Only your sent text messages can be edited.");
+            return;
+        }
+
+        string trimmed = newText.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            OnStatusChanged("Edited message cannot be empty.");
+            return;
+        }
+
+        await SendCommandAsync($"/edit {message.MessageId} {trimmed}");
+    }
+
+    public async Task DeleteMessageAsync(ChatMessage message)
+    {
+        if (message == null || !message.CanDelete)
+        {
+            OnStatusChanged("Only your sent messages can be deleted.");
+            return;
+        }
+
+        await SendCommandAsync($"/delete {message.MessageId}");
     }
 
     public async Task SendTypingStateAsync(bool isTyping)
@@ -798,6 +829,12 @@ public sealed class ChatClientSession
             return;
         }
 
+        if (string.Equals(incoming.Type, "delete", StringComparison.OrdinalIgnoreCase))
+        {
+            RemoveMessageById(incoming.MessageId);
+            return;
+        }
+
         string line = incoming.Text;
         if (line.StartsWith("[System] ", StringComparison.Ordinal))
         {
@@ -810,16 +847,7 @@ public sealed class ChatClientSession
             ChatMessage? message = TryParseConversationMessage(incoming);
             if (message != null)
             {
-                bool added = AddMessageIfNew(message);
-                ConversationListItem? item = conversations.FirstOrDefault(existing =>
-                    existing.TargetType == message.ConversationType &&
-                    existing.Name.Equals(message.ConversationName, StringComparison.OrdinalIgnoreCase));
-                if (item != null)
-                {
-                    item.LastMessage = message.Text;
-                    item.Timestamp = message.Timestamp;
-                }
-
+                AddOrReplaceMessage(message);
                 RefreshVisibleMessages();
                 ConversationCollectionChanged?.Invoke();
             }
@@ -828,13 +856,22 @@ public sealed class ChatClientSession
 
     private bool AddMessageIfNew(ChatMessage message)
     {
+        return AddOrReplaceMessage(message);
+    }
+
+    private bool AddOrReplaceMessage(ChatMessage message)
+    {
         if (!string.IsNullOrWhiteSpace(message.MessageId) &&
-            allMessages.Any(existing => existing.MessageId.Equals(message.MessageId, StringComparison.OrdinalIgnoreCase)))
+            allMessages.FindIndex(existing => existing.MessageId.Equals(message.MessageId, StringComparison.OrdinalIgnoreCase)) is int existingIndex &&
+            existingIndex >= 0)
         {
+            allMessages[existingIndex] = message;
+            UpdateConversationPreview(message.ConversationType, message.ConversationName);
             return false;
         }
 
         allMessages.Add(message);
+        UpdateConversationPreview(message.ConversationType, message.ConversationName);
         bool isSelectedConversation = IsSelectedConversation(message.ConversationName, message.ConversationType);
         if (!message.IsSent && !isSelectedConversation)
         {
@@ -853,6 +890,27 @@ public sealed class ChatClientSession
         }
 
         return true;
+    }
+
+    private void RemoveMessageById(string messageId)
+    {
+        if (string.IsNullOrWhiteSpace(messageId))
+        {
+            return;
+        }
+
+        int removedCount = allMessages.RemoveAll(message =>
+            message.MessageId.Equals(messageId, StringComparison.OrdinalIgnoreCase));
+
+        if (removedCount == 0)
+        {
+            return;
+        }
+
+        UpdateAllConversationPreviews();
+        RefreshVisibleMessages();
+        ConversationCollectionChanged?.Invoke();
+        OnStatusChanged("Message deleted.");
     }
 
     private static string GetNotificationPreview(ChatMessage message)
@@ -891,6 +949,7 @@ public sealed class ChatClientSession
         allMessages.RemoveAll(message =>
             message.ConversationType == selectedConversationType &&
             message.ConversationName.Equals(selectedConversationName, StringComparison.OrdinalIgnoreCase));
+        UpdateConversationPreview(selectedConversationType, selectedConversationName);
         RefreshVisibleMessages();
         ConversationCollectionChanged?.Invoke();
         OnStatusChanged("Chat view cleared locally.");
@@ -1055,6 +1114,7 @@ public sealed class ChatClientSession
         allMessages.RemoveAll(existing =>
             existing.ConversationType == conversationType &&
             existing.ConversationName.Equals(conversationName, StringComparison.OrdinalIgnoreCase));
+        UpdateConversationPreview(conversationType, conversationName);
         RefreshVisibleMessages();
         ConversationCollectionChanged?.Invoke();
     }
@@ -1186,7 +1246,7 @@ public sealed class ChatClientSession
             Name = name,
             DisplayName = name,
             Initials = GetInitials(name),
-            LastMessage = type == ConversationTargetType.Group ? "Group ready" : "Double-click to open chat",
+            LastMessage = EmptyConversationPreview,
             Timestamp = string.Empty,
             TypeLabel = type == ConversationTargetType.Group ? "Group" : (pin ? "Friend" : "User"),
             TargetType = type,
@@ -1194,6 +1254,65 @@ public sealed class ChatClientSession
             StatusText = resolvedStatusText,
             StatusBrush = resolvedStatusBrush
         });
+    }
+
+    private void UpdateAllConversationPreviews()
+    {
+        foreach (ConversationListItem item in conversations)
+        {
+            UpdateConversationPreview(item.TargetType, item.Name);
+        }
+    }
+
+    private void UpdateConversationPreview(ConversationTargetType type, string conversationName)
+    {
+        ConversationListItem? item = conversations.FirstOrDefault(existing =>
+            existing.TargetType == type &&
+            existing.Name.Equals(conversationName, StringComparison.OrdinalIgnoreCase));
+        if (item == null)
+        {
+            return;
+        }
+
+        ChatMessage? lastMessage = allMessages.LastOrDefault(message =>
+            message.ConversationType == type &&
+            message.ConversationName.Equals(conversationName, StringComparison.OrdinalIgnoreCase));
+
+        if (lastMessage == null)
+        {
+            item.LastMessage = EmptyConversationPreview;
+            item.Timestamp = string.Empty;
+            return;
+        }
+
+        item.LastMessage = GetConversationPreview(lastMessage);
+        item.Timestamp = lastMessage.Timestamp;
+    }
+
+    private static string GetConversationPreview(ChatMessage message)
+    {
+        if (message.HasText)
+        {
+            return message.Text;
+        }
+
+        if (message.HasImage)
+        {
+            return message.IsSent ? "You sent an image" : $"{message.Label} sent an image";
+        }
+
+        if (message.HasAudio)
+        {
+            string label = string.IsNullOrWhiteSpace(message.AudioKindLabel) ? "Audio attachment" : message.AudioKindLabel;
+            return message.IsSent ? $"You sent {label.ToLowerInvariant()}" : $"{message.Label} sent {label.ToLowerInvariant()}";
+        }
+
+        if (message.HasVideo)
+        {
+            return message.IsSent ? "You sent a video" : $"{message.Label} sent a video";
+        }
+
+        return EmptyConversationPreview;
     }
 
     private void SetSelectedConversation(string name, ConversationTargetType type)

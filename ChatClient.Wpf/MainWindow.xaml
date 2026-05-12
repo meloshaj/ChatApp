@@ -484,14 +484,36 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Grid Margin="0,0,0,16">
-                                <Border Background="{Binding MessageBackground}"
-                                        CornerRadius="{Binding CornerRadius}"
-                                        Padding="16,12"
-                                        MaxWidth="600"
-                                        HorizontalAlignment="{Binding Alignment}">
-                                    <Border.Effect>
-                                        <DropShadowEffect BlurRadius="8"
-                                                          ShadowDepth="2"
+                                 <Border Background="{Binding MessageBackground}"
+                                         CornerRadius="{Binding CornerRadius}"
+                                         Padding="16,12"
+                                         MaxWidth="600"
+                                         HorizontalAlignment="{Binding Alignment}"
+                                         ContextMenuOpening="MessageBubble_ContextMenuOpening">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Edit"
+                                                      Click="EditMessageButton_Click"
+                                                      DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                                <MenuItem.Style>
+                                                    <Style TargetType="MenuItem">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding CanEdit}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </MenuItem.Style>
+                                            </MenuItem>
+                                            <MenuItem Header="Delete"
+                                                      Click="DeleteMessageButton_Click"
+                                                      DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                     <Border.Effect>
+                                         <DropShadowEffect BlurRadius="8"
+                                                           ShadowDepth="2"
                                                           Opacity="0.1"
                                                           Color="Black" />
                                     </Border.Effect>

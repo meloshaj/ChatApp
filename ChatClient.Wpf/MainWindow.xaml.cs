@@ -200,6 +200,52 @@ public partial class MainWindow : Window
         MessageInputTextBox.Clear();
     }
 
+    private async void EditMessageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: ChatMessage message })
+        {
+            return;
+        }
+
+        string? editedText = PromptForEditedMessage(message.Text);
+        if (editedText == null)
+        {
+            return;
+        }
+
+        await session.EditMessageAsync(message, editedText);
+    }
+
+    private async void DeleteMessageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: ChatMessage message })
+        {
+            return;
+        }
+
+        MessageBoxResult result = MessageBox.Show(
+            this,
+            "Delete this message for everyone?",
+            "Delete message",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await session.DeleteMessageAsync(message);
+    }
+
+    private void MessageBubble_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: ChatMessage message } || !message.CanDelete)
+        {
+            e.Handled = true;
+        }
+    }
+
     private void EmojiButton_Click(object sender, RoutedEventArgs e)
     {
         EmojiPopup.IsOpen = !EmojiPopup.IsOpen;
@@ -452,5 +498,79 @@ public partial class MainWindow : Window
             FileName = path,
             UseShellExecute = true
         });
+    }
+
+    private string? PromptForEditedMessage(string currentText)
+    {
+        Window dialog = new()
+        {
+            Title = "Edit message",
+            Owner = this,
+            Width = 420,
+            Height = 190,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            Background = System.Windows.Media.Brushes.White
+        };
+
+        Grid layout = new() { Margin = new Thickness(16) };
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        TextBlock label = new()
+        {
+            Text = "Message",
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        Grid.SetRow(label, 0);
+
+        TextBox input = new()
+        {
+            Text = currentText,
+            MinHeight = 42,
+            TextWrapping = TextWrapping.Wrap,
+            Padding = new Thickness(10),
+            BorderThickness = new Thickness(1)
+        };
+        input.SelectAll();
+        Grid.SetRow(input, 1);
+
+        StackPanel buttons = new()
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 16, 0, 0)
+        };
+
+        Button cancelButton = new()
+        {
+            Content = "Cancel",
+            MinWidth = 82,
+            Height = 34,
+            Margin = new Thickness(0, 0, 8, 0),
+            IsCancel = true
+        };
+
+        Button saveButton = new()
+        {
+            Content = "Save",
+            MinWidth = 82,
+            Height = 34,
+            IsDefault = true
+        };
+        saveButton.Click += (_, _) => dialog.DialogResult = true;
+
+        buttons.Children.Add(cancelButton);
+        buttons.Children.Add(saveButton);
+        Grid.SetRow(buttons, 2);
+
+        layout.Children.Add(label);
+        layout.Children.Add(input);
+        layout.Children.Add(buttons);
+        dialog.Content = layout;
+
+        return dialog.ShowDialog() == true ? input.Text : null;
     }
 }
