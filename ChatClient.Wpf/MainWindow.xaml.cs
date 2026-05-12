@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO;
+using System.Media;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using ChatClient.Wpf.Models;
 using ChatClient.Wpf.Services;
 
@@ -13,6 +15,7 @@ public partial class MainWindow : Window
     private readonly ChatClientSession session = new();
     private readonly AuthenticationClient authClient;
     private readonly string authenticatedUsername;
+    private readonly DispatcherTimer notificationTimer = new() { Interval = TimeSpan.FromSeconds(4) };
 
     public MainWindow(AuthenticationClient authClient, string username)
     {
@@ -22,9 +25,11 @@ public partial class MainWindow : Window
         this.authenticatedUsername = username;
         
         session.StatusChanged += HandleStatusChanged;
+        session.MessageNotificationReceived += ShowMessageNotification;
         session.ConversationCollectionChanged += RefreshConversationList;
         session.ConversationSelectionChanged += () => RefreshHeader();
         MessagesItemsControl.ItemsSource = session.VisibleMessages;
+        notificationTimer.Tick += HideMessageNotification;
         
         // Set authenticated connection
         session.SetAuthenticatedConnection(authClient.GetClient()!, authClient.GetStream()!, username);
@@ -181,13 +186,6 @@ public partial class MainWindow : Window
         RefreshHeader();
     }
 
-    private async void RenameGroupButton_Click(object sender, RoutedEventArgs e)
-    {
-        await session.RenameGroupAsync(GroupNameTextBox.Text, GroupMemberTextBox.Text);
-        RefreshConversationList();
-        RefreshHeader();
-    }
-
     private async void OpenGroupChatButton_Click(object sender, RoutedEventArgs e)
     {
         await session.OpenGroupChatAsync(GroupNameTextBox.Text);
@@ -322,6 +320,23 @@ public partial class MainWindow : Window
         UpdateUiState();
     }
 
+    private void ShowMessageNotification(string sender, string preview)
+    {
+        SystemSounds.Exclamation.Play();
+        MessageNotificationTitle.Text = $"New message from {sender}";
+        MessageNotificationText.Text = preview;
+        MessageNotificationBorder.Visibility = Visibility.Visible;
+
+        notificationTimer.Stop();
+        notificationTimer.Start();
+    }
+
+    private void HideMessageNotification(object? sender, EventArgs e)
+    {
+        notificationTimer.Stop();
+        MessageNotificationBorder.Visibility = Visibility.Collapsed;
+    }
+
     private void RefreshConversationList()
     {
         ContactsListBox.ItemsSource = session.GetFilteredConversations();
@@ -370,7 +385,6 @@ public partial class MainWindow : Window
         AddToGroupButton.IsEnabled = canUseCommands;
         OpenGroupChatButton.IsEnabled = canUseCommands;
         RemoveFromGroupButton.IsEnabled = canUseCommands;
-        RenameGroupButton.IsEnabled = canUseCommands;
         SendButton.IsEnabled = canSend;
         SendImageButton.IsEnabled = canSend;
         BrowseImageButton.IsEnabled = canSend;

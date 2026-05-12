@@ -216,7 +216,7 @@ namespace ChatCore.Services
         {
             if (parts.Length < 2)
             {
-                await SendSystemMessageAsync(user, "Usage: /group create <group>, /group add <group> <username>, /group remove <group> <username>, /group rename <group> <new name>, /group chat <group>.");
+                await SendSystemMessageAsync(user, "Usage: /group create <group>, /group add <group> <username>, /group remove <group> <username>, /group chat <group>.");
                 return;
             }
 
@@ -234,9 +234,6 @@ namespace ChatCore.Services
                 case "remove" when TrySplitGroupAndUsername(arguments, out string groupName, out string username):
                     await HandleRemoveFromGroupAsync(user, groupName, username);
                     break;
-                case "rename" when TrySplitGroupAndUsername(arguments, out string groupName, out string newName):
-                    await HandleRenameGroupAsync(user, groupName, newName);
-                    break;
                 case "chat" when !string.IsNullOrWhiteSpace(arguments):
                     await HandleOpenGroupChatAsync(user, arguments);
                     break;
@@ -244,7 +241,7 @@ namespace ChatCore.Services
                     await HandleGroupMembersAsync(user, arguments);
                     break;
                 default:
-                    await SendSystemMessageAsync(user, "Usage: /group create <group>, /group add <group> <username>, /group remove <group> <username>, /group rename <group> <new name>, /group chat <group>.");
+                    await SendSystemMessageAsync(user, "Usage: /group create <group>, /group add <group> <username>, /group remove <group> <username>, /group chat <group>.");
                     break;
             }
         }
@@ -445,27 +442,6 @@ namespace ChatCore.Services
             else
             {
                 await SendSystemMessageAsync(user, "Could not remove user from group.");
-            }
-        }
-
-        private async Task HandleRenameGroupAsync(User user, string groupName, string newName)
-        {
-            var group = await conversationService.GetGroupConversationAsync(groupName);
-            if (group == null)
-            {
-                await SendSystemMessageAsync(user, "Group not found.");
-                return;
-            }
-
-            string oldName = group.Name;
-            if (await conversationService.RenameGroupAsync(group, user, newName))
-            {
-                await SendSystemMessageAsync(user, $"Group renamed: {oldName} -> {group.Name}.");
-                await HandleGroupsCommandAsync(user);
-            }
-            else
-            {
-                await SendSystemMessageAsync(user, "Could not rename group.");
             }
         }
 

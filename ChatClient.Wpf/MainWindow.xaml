@@ -382,8 +382,6 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Button x:Name="CreateGroupButton"
                                     Grid.Column="0"
@@ -402,14 +400,9 @@
                                     Content="Open Group" />
                             <Button x:Name="RemoveFromGroupButton"
                                     Grid.Column="3"
-                                    Margin="6,0,6,0"
+                                    Margin="6,0,0,0"
                                     Click="RemoveFromGroupButton_Click"
                                     Content="Remove" />
-                            <Button x:Name="RenameGroupButton"
-                                    Grid.Column="4"
-                                    Margin="6,0,0,0"
-                                    Click="RenameGroupButton_Click"
-                                    Content="Rename" />
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -867,6 +860,37 @@
                 </StackPanel>
             </Border>
         </Grid>
+
+        <Border x:Name="MessageNotificationBorder"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Width="320"
+                Margin="0,24,24,0"
+                Padding="14"
+                Background="{StaticResource CardBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                Visibility="Collapsed">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="18"
+                                  ShadowDepth="3"
+                                  Opacity="0.18"
+                                  Color="Black" />
+            </Border.Effect>
+            <StackPanel>
+                <TextBlock x:Name="MessageNotificationTitle"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource ForegroundBrush}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="MessageNotificationText"
+                           Margin="0,4,0,0"
+                           FontSize="12"
+                           Foreground="{StaticResource MutedForegroundBrush}"
+                           TextWrapping="Wrap"
+                           MaxHeight="44" />
+            </StackPanel>
+        </Border>
 
     </Grid>
 </Window>

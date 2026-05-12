@@ -82,23 +82,5 @@ namespace ChatCore.Services
             return conversation.ParticipantIds.Remove(member.Id);
         }
 
-        public async Task<bool> RenameGroupAsync(GroupConversation conversation, User requester, string newName)
-        {
-            string normalizedName = newName.Trim();
-            if (conversation.OwnerId != requester.Id || string.IsNullOrWhiteSpace(normalizedName))
-            {
-                return false;
-            }
-
-            var existing = await conversationRepository.GetGroupByNameAsync(normalizedName);
-            if (existing != null && existing.Id != conversation.Id)
-            {
-                return false;
-            }
-
-            conversation.Name = normalizedName;
-            await conversationRepository.UpdateAsync(conversation);
-            return true;
-        }
     }
 }

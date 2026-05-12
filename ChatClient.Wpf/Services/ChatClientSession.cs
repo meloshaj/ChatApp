@@ -48,6 +48,7 @@ public sealed class ChatClientSession
     public string TypingStatusText => typingStatusText;
 
     public event Action<string>? StatusChanged;
+    public event Action<string, string>? MessageNotificationReceived;
     public event Action? ConversationCollectionChanged;
     public event Action? ConversationSelectionChanged;
 
@@ -241,18 +242,6 @@ public sealed class ChatClientSession
 
         await SendCommandAsync($"/group remove {groupName.Trim()} {username.Trim()}");
         await SendCommandAsync($"/group members {groupName.Trim()}");
-        await SendCommandAsync("/groups");
-    }
-
-    public async Task RenameGroupAsync(string groupName, string newName)
-    {
-        if (string.IsNullOrWhiteSpace(groupName) || string.IsNullOrWhiteSpace(newName))
-        {
-            OnStatusChanged("Enter a group name and new name.");
-            return;
-        }
-
-        await SendCommandAsync($"/group rename {groupName.Trim()} {newName.Trim()}");
         await SendCommandAsync("/groups");
     }
 
@@ -751,7 +740,13 @@ public sealed class ChatClientSession
         }
 
         allMessages.Add(message);
-        if (!IsSelectedConversation(message.ConversationName, message.ConversationType))
+        bool isSelectedConversation = IsSelectedConversation(message.ConversationName, message.ConversationType);
+        if (!message.IsSent && !isSelectedConversation)
+        {
+            MessageNotificationReceived?.Invoke(message.Label, GetNotificationPreview(message));
+        }
+
+        if (!isSelectedConversation)
         {
             ConversationListItem? item = conversations.FirstOrDefault(existing =>
                 existing.TargetType == message.ConversationType &&
@@ -763,6 +758,31 @@ public sealed class ChatClientSession
         }
 
         return true;
+    }
+
+    private static string GetNotificationPreview(ChatMessage message)
+    {
+        if (message.HasText)
+        {
+            return message.Text;
+        }
+
+        if (message.HasImage)
+        {
+            return "Sent an image";
+        }
+
+        if (message.HasAudio)
+        {
+            return message.AudioKindLabel;
+        }
+
+        if (message.HasVideo)
+        {
+            return "Sent a video";
+        }
+
+        return "New message";
     }
 
     public void ClearSelectedVisibleMessages()
@@ -1014,19 +1034,6 @@ public sealed class ChatClientSession
             return;
         }
 
-        if (message.StartsWith("Group renamed: ", StringComparison.OrdinalIgnoreCase) && message.EndsWith('.'))
-        {
-            string rename = message[15..^1];
-            string[] parts = rename.Split(" -> ", 2, StringSplitOptions.TrimEntries);
-            if (parts.Length == 2)
-            {
-                RenameLocalGroup(parts[0], parts[1]);
-            }
-
-            OnStatusChanged(message);
-            return;
-        }
-
         if (message.StartsWith("HISTORY_RESET|", StringComparison.Ordinal))
         {
             ResetConversationHistory(message);
@@ -1108,28 +1115,6 @@ public sealed class ChatClientSession
         typingStatusText = string.Empty;
         lastTypingState = false;
         RefreshVisibleMessages();
-        ConversationSelectionChanged?.Invoke();
-        ConversationCollectionChanged?.Invoke();
-    }
-
-    private void RenameLocalGroup(string oldName, string newName)
-    {
-        ConversationListItem? item = conversations.FirstOrDefault(existing =>
-            existing.TargetType == ConversationTargetType.Group &&
-            existing.Name.Equals(oldName, StringComparison.OrdinalIgnoreCase));
-        if (item != null)
-        {
-            item.Name = newName;
-            item.DisplayName = newName;
-            item.Initials = GetInitials(newName);
-        }
-
-        if (IsSelectedConversation(oldName, ConversationTargetType.Group))
-        {
-            selectedConversationName = newName;
-            RefreshVisibleMessages();
-        }
-
         ConversationSelectionChanged?.Invoke();
         ConversationCollectionChanged?.Invoke();
     }
