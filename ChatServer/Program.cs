@@ -12,6 +12,8 @@ using ChatCore.Security;
 
 class Program
 {
+    private const string DiscoveryRequest = "CHATAPP_DISCOVER_V1";
+    private const string DiscoveryResponse = "CHATAPP_SERVER_V1";
     private static SqliteUserRepository userRepository = null!;
     private static SqliteConversationRepository conversationRepository = null!;
     private static SqliteMessageRepository messageRepository = null!;
@@ -33,6 +35,7 @@ class Program
         int port = ParsePort(args);
         TcpListener server = new TcpListener(IPAddress.Any, port);
         server.Start();
+        _ = Task.Run(() => RunDiscoveryResponderAsync(port));
 
         Console.WriteLine($"Enhanced Server started on port {port}.");
         Console.WriteLine("Clients on other devices can connect using one of these server addresses:");
@@ -41,6 +44,7 @@ class Program
             Console.WriteLine($"  {address}:{port}");
         }
         Console.WriteLine("Features: Authentication, Message History, Typing Indicators, User Presence");
+        Console.WriteLine("If clients on the same WiFi cannot connect, allow this app through Windows Firewall on private networks.");
         Console.WriteLine();
 
         while (true)
@@ -73,6 +77,33 @@ class Program
             .Where(address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
             .Select(address => address.ToString())
             .DefaultIfEmpty("127.0.0.1");
+    }
+
+    static async Task RunDiscoveryResponderAsync(int tcpPort)
+    {
+        try
+        {
+            using UdpClient udp = new(tcpPort);
+            while (true)
+            {
+                UdpReceiveResult request = await udp.ReceiveAsync();
+                string text = System.Text.Encoding.UTF8.GetString(request.Buffer);
+                if (!string.Equals(text, DiscoveryRequest, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                byte[] response = System.Text.Encoding.UTF8.GetBytes($"{DiscoveryResponse}|{Dns.GetHostName()}|{tcpPort}");
+                await udp.SendAsync(response, response.Length, request.RemoteEndPoint);
+            }
+        }
+        catch (SocketException ex)
+        {
+            Console.WriteLine($"LAN discovery is unavailable on UDP port {tcpPort}: {ex.Message}");
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     static async Task InitializeServicesAsync()

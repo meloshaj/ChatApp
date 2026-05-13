@@ -7,12 +7,14 @@ namespace ChatClient.Wpf;
 public partial class LoginWindow : Window
 {
     private readonly AuthenticationClient authClient = new();
+    private readonly ServerDiscoveryClient discoveryClient = new();
     private bool isRegistering = false;
 
     public LoginWindow()
     {
         InitializeComponent();
         UsernameTextBox.Focus();
+        _ = TryDiscoverServerAsync(showStatus: false);
     }
 
     private async void LoginButton_Click(object sender, RoutedEventArgs e)
@@ -61,6 +63,59 @@ public partial class LoginWindow : Window
         {
             LoginButton.IsEnabled = true;
             LoginButton.Content = isRegistering ? "Sign Up" : "Sign In";
+        }
+    }
+
+    private async void DiscoverServerButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TryDiscoverServerAsync(showStatus: true);
+    }
+
+    private async Task TryDiscoverServerAsync(bool showStatus)
+    {
+        if (!int.TryParse(PortTextBox.Text.Trim(), out int port))
+        {
+            if (showStatus)
+            {
+                ShowStatus("Enter a valid port before searching.", isError: true);
+            }
+            return;
+        }
+
+        DiscoverServerButton.IsEnabled = false;
+        string previousContent = DiscoverServerButton.Content?.ToString() ?? "Find Server";
+        DiscoverServerButton.Content = "Searching...";
+
+        try
+        {
+            DiscoveredServer? server = await discoveryClient.FindServerAsync(port, TimeSpan.FromSeconds(2));
+            if (server == null)
+            {
+                if (showStatus)
+                {
+                    ShowStatus("No server found on this WiFi. Start ChatServer or allow it through Windows Firewall.", isError: true);
+                }
+                return;
+            }
+
+            HostTextBox.Text = server.Host;
+            PortTextBox.Text = server.Port.ToString();
+            if (showStatus)
+            {
+                ShowStatus($"Found {server.Name} at {server.Host}:{server.Port}.", isError: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (showStatus)
+            {
+                ShowStatus($"Server search failed: {ex.Message}", isError: true);
+            }
+        }
+        finally
+        {
+            DiscoverServerButton.Content = previousContent;
+            DiscoverServerButton.IsEnabled = true;
         }
     }
 

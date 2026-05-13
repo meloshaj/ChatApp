@@ -27,7 +27,7 @@ The published files are created under:
 
 Run `ChatServer.exe` on one computer on the network. It listens on all network interfaces on port `13000` by default and prints the IP addresses that clients can use. If Windows Firewall asks for permission, allow private network access.
 
-Copy `ChatClient.Wpf.exe` to each Windows device. In the login window, enter the server IP address shown by `ChatServer.exe` and port `13000`.
+Copy `ChatClient.Wpf.exe` to each Windows device. In the login window, click `Find Server` or enter the server IP address shown by `ChatServer.exe` and port `13000`.
 
 To use another port:
 

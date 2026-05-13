@@ -215,7 +215,7 @@ namespace ChatCore.Services
                 var stream = user.GetStream();
                 if (stream == null) return;
 
-                var networkMessage = ProtectForUser(user, BuildNetworkMessage(user, message));
+                var networkMessage = BuildNetworkMessage(user, message);
                 await networkManager.SendMessage(stream, ProtectForUser(user, networkMessage));
             }
             catch
@@ -271,7 +271,7 @@ namespace ChatCore.Services
                     Timestamp = DateTime.UtcNow
                 };
 
-                await networkManager.SendMessage(stream, networkMessage);
+                await networkManager.SendMessage(stream, ProtectForUser(user, networkMessage));
             }
             catch
             {
