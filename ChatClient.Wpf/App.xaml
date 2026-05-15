@@ -11,6 +11,7 @@
         <SolidColorBrush x:Key="AccentBrush" Color="#E9EBEF" />
         <SolidColorBrush x:Key="PrimaryBlueBrush" Color="#3B82F6" />
         <SolidColorBrush x:Key="PrimaryBlueHoverBrush" Color="#2563EB" />
+        <SolidColorBrush x:Key="PrimaryRedBrush" Color="#EF4444" />
         <SolidColorBrush x:Key="SentMessageBrush" Color="#3B82F6" />
         <SolidColorBrush x:Key="ReceivedMessageBrush" Color="#ECECF0" />
         <SolidColorBrush x:Key="SentMessageTextBrush" Color="#FFFFFF" />
@@ -160,7 +161,9 @@
                                     BorderThickness="{TemplateBinding BorderThickness}" />
                             <ScrollViewer x:Name="PART_ContentHost"
                                           Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Hidden" />
                             <TextBlock x:Name="PlaceholderText"
                                        Text="{TemplateBinding Tag}"
                                        Margin="{TemplateBinding Padding}"

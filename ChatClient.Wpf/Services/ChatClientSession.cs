@@ -129,7 +129,9 @@ public sealed class ChatClientSession
         client?.Close();
         stream = null;
         client = null;
+        secureSession = null;
         isConnected = false;
+        currentUsername = null;
         selectedConversationName = null;
         selectedConversationType = ConversationTargetType.None;
         OnStatusChanged("Disconnected.");
@@ -1122,9 +1124,9 @@ public sealed class ChatClientSession
 
     private void ProcessSystemMessage(string message)
     {
-        if (message.StartsWith("Welcome ", StringComparison.OrdinalIgnoreCase) && message.EndsWith('.'))
+        if (message.StartsWith("Welcome back, ", StringComparison.OrdinalIgnoreCase) && message.EndsWith('!'))
         {
-            currentUsername = message[8..^1];
+            currentUsername = message[14..^1];
             OnStatusChanged(message);
             ConversationSelectionChanged?.Invoke();
             return;

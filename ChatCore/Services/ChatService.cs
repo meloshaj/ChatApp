@@ -47,9 +47,6 @@ namespace ChatCore.Services
                 message = processor.Process(message);
             }
 
-            // Save to repository
-            await messageRepository.AddAsync(message);
-
             var conversation = await conversationRepository.GetByIdAsync(message.ConversationId);
             if (conversation == null)
             {
@@ -60,6 +57,9 @@ namespace ChatCore.Services
             {
                 return;
             }
+
+            // Save to repository
+            await messageRepository.AddAsync(message);
 
             conversation.AddMessage(message);
             await conversationRepository.UpdateAsync(conversation);
@@ -220,7 +220,7 @@ namespace ChatCore.Services
                 var stream = user.GetStream();
                 if (stream == null) return;
 
-                var networkMessage = BuildNetworkMessage(user, message);
+                var networkMessage = await BuildNetworkMessageAsync(user, message);
                 await networkManager.SendMessage(stream, ProtectForUser(user, networkMessage));
             }
             catch
@@ -241,7 +241,7 @@ namespace ChatCore.Services
                 var conversation = await conversationRepository.GetByIdAsync(notification.ConversationId);
                 string scope = conversation is GroupConversation ? "Group" : "Private";
                 string name = conversation is PrivateConversation privateConversation
-                    ? GetPrivateConversationLabel(privateConversation, user)
+                    ? await GetPrivateConversationLabelAsync(privateConversation, user)
                     : conversation?.Name ?? notification.ConversationId;
 
                 var networkMessage = new NetworkMessage
@@ -284,9 +284,9 @@ namespace ChatCore.Services
             }
         }
 
-        private NetworkMessage BuildNetworkMessage(User recipient, Message message)
+        private async Task<NetworkMessage> BuildNetworkMessageAsync(User recipient, Message message)
         {
-            string body = FormatMessageForUser(recipient, message);
+            string body = await FormatMessageForUserAsync(recipient, message);
             
             if (message is ImageMessage imageMessage && imageMessage.ImageData.Length > 0)
             {
@@ -373,9 +373,9 @@ namespace ChatCore.Services
             };
         }
 
-        private string FormatMessageForUser(User recipient, Message message)
+        private async Task<string> FormatMessageForUserAsync(User recipient, Message message)
         {
-            var conversation = conversationRepository.GetByIdAsync(message.ConversationId).Result;
+            var conversation = await conversationRepository.GetByIdAsync(message.ConversationId);
             if (conversation == null)
             {
                 return message.Serialize();
@@ -388,11 +388,9 @@ namespace ChatCore.Services
                 _ => "Conversation"
             };
 
-            string conversationName = conversation switch
-            {
-                PrivateConversation privateConversation => GetPrivateConversationLabel(privateConversation, recipient),
-                _ => conversation.Name
-            };
+            string conversationName = conversation is PrivateConversation privateConversation
+                ? await GetPrivateConversationLabelAsync(privateConversation, recipient)
+                : conversation.Name;
 
             string body = message.Serialize();
             if (message.IsEdited)
@@ -402,7 +400,7 @@ namespace ChatCore.Services
 
             if (!string.Equals(message.SenderId, "System", StringComparison.Ordinal))
             {
-                var sender = userRepository.GetByIdAsync(message.SenderId).Result;
+                var sender = await userRepository.GetByIdAsync(message.SenderId);
                 if (sender != null)
                 {
                     body = $"{sender.Username}: {body}";
@@ -412,10 +410,10 @@ namespace ChatCore.Services
             return $"[Chat|{scope}|{conversationName}] {body}";
         }
 
-        private string GetPrivateConversationLabel(PrivateConversation conversation, User recipient)
+        private async Task<string> GetPrivateConversationLabelAsync(PrivateConversation conversation, User recipient)
         {
             string? otherParticipantId = conversation.ParticipantIds.FirstOrDefault(id => id != recipient.Id);
-            var otherParticipant = otherParticipantId == null ? null : userRepository.GetByIdAsync(otherParticipantId).Result;
+            var otherParticipant = otherParticipantId == null ? null : await userRepository.GetByIdAsync(otherParticipantId);
             return otherParticipant?.Username ?? conversation.Name;
         }
 
