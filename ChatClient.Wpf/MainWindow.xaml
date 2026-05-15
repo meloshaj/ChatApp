@@ -303,41 +303,9 @@
                         </Grid>
 
                         <TextBlock Margin="0,12,0,6"
-                                   Text="Friends and groups"
+                                   Text="Groups"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource ForegroundBrush}" />
-                        <Grid>
-                            <TextBox x:Name="FriendUserTextBox"
-                                     Height="36"
-                                     Padding="12,8"
-                                     Background="{StaticResource MutedBrush}"
-                                     Foreground="{StaticResource ForegroundBrush}"
-                                     BorderThickness="1"
-                                     BorderBrush="{StaticResource BorderBrush}"
-                                     TextChanged="FriendUserTextBox_TextChanged" />
-                            <TextBlock x:Name="FriendUserPlaceholder"
-                                       Text="Friend username"
-                                       Margin="12,0,0,0"
-                                       Foreground="{StaticResource MutedForegroundBrush}"
-                                       IsHitTestVisible="False"
-                                       VerticalAlignment="Center" />
-                        </Grid>
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Button x:Name="AddFriendButton"
-                                    Grid.Column="0"
-                                    Margin="0,0,6,0"
-                                    Click="AddFriendButton_Click"
-                                    Content="Add Friend" />
-                            <Button x:Name="OpenPrivateChatButton"
-                                    Grid.Column="1"
-                                    Margin="6,0,0,0"
-                                    Click="OpenPrivateChatButton_Click"
-                                    Content="Open Chat" />
-                        </Grid>
 
                         <Grid Margin="0,12,0,0">
                             <Grid.ColumnDefinitions>
@@ -730,11 +698,21 @@
                                  Text="0" />
                     </Grid>
 
-                    <TextBlock x:Name="AttachmentPreviewTextBlock"
-                               Margin="0,0,0,8"
-                               FontSize="12"
-                               Foreground="{StaticResource MutedForegroundBrush}"
-                               Visibility="Collapsed" />
+                    <StackPanel x:Name="AttachmentPreviewPanel" Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed">
+                        <TextBlock x:Name="AttachmentPreviewTextBlock"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedForegroundBrush}"
+                                   VerticalAlignment="Center" />
+                        <Button x:Name="ClearAttachmentButton"
+                                Content="X"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Foreground="{StaticResource PrimaryRedBrush}"
+                                FontWeight="Bold"
+                                Margin="8,0,0,0"
+                                Click="ClearAttachmentButton_Click"
+                                Cursor="Hand" />
+                    </StackPanel>
 
                     <Grid>
                         <Grid.ColumnDefinitions>

@@ -429,6 +429,12 @@ namespace ChatCore.Services
                 return;
             }
 
+            if (!group.HasParticipant(member.Id))
+            {
+                await SendSystemMessageAsync(user, "User not found.");
+                return;
+            }
+
             if (conversationService.RemoveUserFromGroup(group, user, member))
             {
                 await conversationRepository.UpdateAsync(group);

@@ -56,6 +56,11 @@ namespace ChatCore.Services
                 return;
             }
 
+            if (!conversation.HasParticipant(sender.Id))
+            {
+                return;
+            }
+
             conversation.AddMessage(message);
             await conversationRepository.UpdateAsync(conversation);
 

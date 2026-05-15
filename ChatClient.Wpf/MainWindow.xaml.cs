@@ -80,11 +80,6 @@ public partial class MainWindow : Window
         RefreshConversationList();
     }
 
-    private void FriendUserTextBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        UpdatePlaceholder(FriendUserTextBox, FriendUserPlaceholder);
-    }
-
     private void GroupNameTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         UpdatePlaceholder(GroupNameTextBox, GroupNamePlaceholder);
@@ -102,11 +97,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (item.TargetType == ConversationTargetType.Private)
-        {
-            FriendUserTextBox.Text = item.Name;
-        }
-        else
+        if (item.TargetType == ConversationTargetType.Group)
         {
             GroupNameTextBox.Text = item.Name;
         }
@@ -135,31 +126,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (item.TargetType == ConversationTargetType.Private)
-        {
-            await session.OpenPrivateChatAsync(item.Name);
-            FriendUserTextBox.Text = item.Name;
-        }
-        else
+        if (item.TargetType == ConversationTargetType.Group)
         {
             await session.OpenGroupChatAsync(item.Name);
             GroupNameTextBox.Text = item.Name;
         }
 
-        RefreshConversationList();
-        RefreshHeader();
-        UpdateUiState();
-    }
-
-    private async void AddFriendButton_Click(object sender, RoutedEventArgs e)
-    {
-        await session.AddFriendAsync(FriendUserTextBox.Text);
-        RefreshConversationList();
-    }
-
-    private async void OpenPrivateChatButton_Click(object sender, RoutedEventArgs e)
-    {
-        await session.OpenPrivateChatAsync(FriendUserTextBox.Text);
         RefreshConversationList();
         RefreshHeader();
         UpdateUiState();
@@ -425,8 +397,6 @@ public partial class MainWindow : Window
         UsernameTextBox.IsEnabled = !session.IsConnected;
         RefreshButton.IsEnabled = canUseCommands;
         LogoutButton.IsEnabled = true;
-        AddFriendButton.IsEnabled = canUseCommands;
-        OpenPrivateChatButton.IsEnabled = canUseCommands;
         CreateGroupButton.IsEnabled = canUseCommands;
         AddToGroupButton.IsEnabled = canUseCommands;
         OpenGroupChatButton.IsEnabled = canUseCommands;
@@ -454,19 +424,28 @@ public partial class MainWindow : Window
     private void ShowAttachmentPreview(string kind, string filePath)
     {
         AttachmentPreviewTextBlock.Text = $"{kind}: {Path.GetFileName(filePath)}";
-        AttachmentPreviewTextBlock.Visibility = Visibility.Visible;
+        AttachmentPreviewPanel.Visibility = Visibility.Visible;
     }
 
     private void ClearAttachmentPreview()
     {
         AttachmentPreviewTextBlock.Text = string.Empty;
-        AttachmentPreviewTextBlock.Visibility = Visibility.Collapsed;
+        AttachmentPreviewPanel.Visibility = Visibility.Collapsed;
+        ImagePathTextBox.Text = string.Empty;
+        VoicePathTextBox.Text = string.Empty;
+        VideoPathTextBox.Text = string.Empty;
+        session.ClearPendingAttachment();
+    }
+
+    private void ClearAttachmentButton_Click(object sender, RoutedEventArgs e)
+    {
+        ClearAttachmentPreview();
+        HandleStatusChanged("Attachment cleared.");
     }
 
     private void UpdateMainInputPlaceholders()
     {
         UpdatePlaceholder(SearchTextBox, SearchPlaceholder);
-        UpdatePlaceholder(FriendUserTextBox, FriendUserPlaceholder);
         UpdatePlaceholder(GroupNameTextBox, GroupNamePlaceholder);
         UpdatePlaceholder(GroupMemberTextBox, GroupMemberPlaceholder);
         UpdatePlaceholder(MessageInputTextBox, MessageInputPlaceholder);

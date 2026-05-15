@@ -182,20 +182,7 @@ public sealed class ChatClientSession
     private async Task RefreshListsConnectedAsync()
     {
         await SendCommandAsync("/users");
-        await SendCommandAsync("/friends");
         await SendCommandAsync("/groups");
-    }
-
-    public async Task AddFriendAsync(string username)
-    {
-        if (string.IsNullOrWhiteSpace(username))
-        {
-            OnStatusChanged("Enter a username to add.");
-            return;
-        }
-
-        await SendCommandAsync($"/friend add {username.Trim()}");
-        await SendCommandAsync("/friends");
     }
 
     public async Task OpenPrivateChatAsync(string username)
@@ -835,6 +822,20 @@ public sealed class ChatClientSession
             return;
         }
 
+        if (string.Equals(incoming.Type, "presence", StringComparison.OrdinalIgnoreCase))
+        {
+            string[] parts = incoming.Text.Split('|', 2);
+            if (parts.Length == 2)
+            {
+                string username = parts[0];
+                string status = parts[1];
+                EnsureConversation(username, ConversationTargetType.Private, false, status);
+                ConversationCollectionChanged?.Invoke();
+                OnStatusChanged($"{username} is now {status}.");
+            }
+            return;
+        }
+
         string line = incoming.Text;
         if (line.StartsWith("[System] ", StringComparison.Ordinal))
         {
@@ -1202,7 +1203,32 @@ public sealed class ChatClientSession
             return;
         }
 
+        if (message.StartsWith("You were removed from group ", StringComparison.OrdinalIgnoreCase) && message.EndsWith('.'))
+        {
+            string groupName = message[28..^1];
+            RemoveConversation(groupName, ConversationTargetType.Group);
+            OnStatusChanged(message);
+            return;
+        }
+
         OnStatusChanged(message);
+    }
+
+    private void RemoveConversation(string name, ConversationTargetType type)
+    {
+        var item = conversations.FirstOrDefault(c => c.TargetType == type && c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (item != null)
+        {
+            conversations.Remove(item);
+            if (selectedConversationType == type && string.Equals(selectedConversationName, name, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedConversationType = ConversationTargetType.None;
+                selectedConversationName = null;
+                groupMembers.Remove(name);
+                RefreshVisibleMessages();
+                ConversationSelectionChanged?.Invoke();
+            }
+        }
     }
 
     private void MergeConversationTargets(IEnumerable<string> names, ConversationTargetType type, bool pin)
