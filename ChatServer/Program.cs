@@ -33,7 +33,7 @@ class Program
         InitializeServicesAsync().GetAwaiter().GetResult();
 
         int port = ParsePort(args);
-        TcpListener server = new TcpListener(IPAddress.Any, port);
+        TcpListener server = TcpListener.Create(port);
         server.Start();
         _ = Task.Run(() => RunDiscoveryResponderAsync(port));
 
@@ -44,7 +44,7 @@ class Program
             Console.WriteLine($"  {address}:{port}");
         }
         Console.WriteLine("Features: Authentication, Message History, Typing Indicators, User Presence");
-        Console.WriteLine("If clients on the same WiFi cannot connect, allow this app through Windows Firewall on private networks.");
+        Console.WriteLine($"If clients on the same WiFi cannot connect, allow port {port} through Windows Firewall on private networks.");
         Console.WriteLine();
 
         while (true)
