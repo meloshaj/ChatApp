@@ -6,6 +6,7 @@ namespace ChatCore.Repositories
     public class InMemoryConversationRepository : IConversationRepository
     {
         private readonly Dictionary<string, Conversation> conversations = new();
+        private readonly List<(string ConversationId, string UserId, DateTime JoinedAt, DateTime? LeftAt)> membershipHistory = new();
         private readonly object lockObject = new();
 
         public Task<Conversation?> GetByIdAsync(string id)
@@ -90,6 +91,45 @@ namespace ChatCore.Repositories
                     .OfType<GroupConversation>()
                     .FirstOrDefault(g => string.Equals(g.Name, groupName, StringComparison.OrdinalIgnoreCase));
                 return Task.FromResult(group);
+            }
+        }
+
+        public Task RecordUserJoinedAsync(string conversationId, string userId, DateTime timestamp)
+        {
+            lock (lockObject)
+            {
+                membershipHistory.Add((conversationId, userId, timestamp, null));
+            }
+            return Task.CompletedTask;
+        }
+
+        public Task RecordUserLeftAsync(string conversationId, string userId, DateTime timestamp)
+        {
+            lock (lockObject)
+            {
+                for (int i = membershipHistory.Count - 1; i >= 0; i--)
+                {
+                    if (membershipHistory[i].ConversationId == conversationId && 
+                        membershipHistory[i].UserId == userId && 
+                        membershipHistory[i].LeftAt == null)
+                    {
+                        membershipHistory[i] = (conversationId, userId, membershipHistory[i].JoinedAt, timestamp);
+                        break;
+                    }
+                }
+            }
+            return Task.CompletedTask;
+        }
+
+        public Task<IEnumerable<(DateTime JoinedAt, DateTime? LeftAt)>> GetMembershipHistoryAsync(string conversationId, string userId)
+        {
+            lock (lockObject)
+            {
+                var history = membershipHistory
+                    .Where(h => h.ConversationId == conversationId && h.UserId == userId)
+                    .Select(h => (h.JoinedAt, h.LeftAt))
+                    .ToList();
+                return Task.FromResult<IEnumerable<(DateTime JoinedAt, DateTime? LeftAt)>>(history);
             }
         }
     }

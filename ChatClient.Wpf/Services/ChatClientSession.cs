@@ -1200,7 +1200,7 @@ public sealed class ChatClientSession
 
         if (message.StartsWith("You were added to group ", StringComparison.OrdinalIgnoreCase) && message.EndsWith('.'))
         {
-            EnsureConversation(message[23..^1], ConversationTargetType.Group, true);
+            EnsureConversation(message[24..^1].Trim(), ConversationTargetType.Group, true);
             OnStatusChanged(message);
             return;
         }

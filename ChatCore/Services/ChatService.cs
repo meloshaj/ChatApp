@@ -89,14 +89,27 @@ namespace ChatCore.Services
             await SendToUserAsync(recipient, message);
         }
 
-        public async Task<IEnumerable<Message>> LoadConversationHistoryAsync(string conversationId, int limit = 100)
+        public async Task<IEnumerable<Message>> LoadConversationHistoryAsync(User user, string conversationId, int limit = 100)
         {
-            return await messageRepository.GetConversationMessagesAsync(conversationId, limit);
+            var messages = await messageRepository.GetConversationMessagesAsync(conversationId, limit);
+            var history = await conversationRepository.GetMembershipHistoryAsync(conversationId, user.Id);
+            var historyList = history.ToList();
+
+            if (historyList.Count == 0)
+            {
+                return messages; // Assume private conversation or no history tracking
+            }
+
+            return messages.Where(m => 
+            {
+                var utcTime = m.Timestamp.ToUniversalTime();
+                return historyList.Any(h => utcTime >= h.JoinedAt && (h.LeftAt == null || utcTime <= h.LeftAt));
+            });
         }
 
         public async Task<int> ReplayConversationHistoryAsync(User recipient, string conversationId, int limit = 100)
         {
-            var messages = await messageRepository.GetConversationMessagesAsync(conversationId, limit);
+            var messages = await LoadConversationHistoryAsync(recipient, conversationId, limit);
             int replayedCount = 0;
 
             foreach (var message in messages)

@@ -90,6 +90,18 @@ namespace ChatCore.Persistence
 
                 CREATE INDEX IF NOT EXISTS idx_conversation_participants_user
                     ON conversation_participants(user_id);
+
+                CREATE TABLE IF NOT EXISTS membership_history (
+                    conversation_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    joined_at TEXT NOT NULL,
+                    left_at TEXT NULL,
+                    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_membership_history 
+                    ON membership_history(conversation_id, user_id);
                 """;
 
             await using var command = connection.CreateCommand();

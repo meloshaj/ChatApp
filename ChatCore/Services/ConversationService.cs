@@ -43,6 +43,7 @@ namespace ChatCore.Services
 
             var conversation = new GroupConversation(owner, normalizedGroupName);
             await conversationRepository.AddAsync(conversation);
+            await conversationRepository.RecordUserJoinedAsync(conversation.Id, owner.Id, DateTime.UtcNow);
             return conversation;
         }
 
@@ -56,7 +57,7 @@ namespace ChatCore.Services
             return await conversationRepository.GetGroupByNameAsync(groupName.Trim());
         }
 
-        public bool AddUserToGroup(GroupConversation conversation, User requester, User newMember)
+        public async Task<bool> AddUserToGroupAsync(GroupConversation conversation, User requester, User newMember)
         {
             if (conversation.OwnerId != requester.Id)
             {
@@ -69,17 +70,24 @@ namespace ChatCore.Services
             }
 
             conversation.AddParticipant(newMember);
+            await conversationRepository.RecordUserJoinedAsync(conversation.Id, newMember.Id, DateTime.UtcNow);
             return true;
         }
 
-        public bool RemoveUserFromGroup(GroupConversation conversation, User requester, User member)
+        public async Task<bool> RemoveUserFromGroupAsync(GroupConversation conversation, User requester, User member)
         {
             if (conversation.OwnerId != requester.Id || member.Id == requester.Id)
             {
                 return false;
             }
 
-            return conversation.ParticipantIds.Remove(member.Id);
+            if (conversation.ParticipantIds.Remove(member.Id))
+            {
+                await conversationRepository.RecordUserLeftAsync(conversation.Id, member.Id, DateTime.UtcNow);
+                return true;
+            }
+            
+            return false;
         }
 
     }

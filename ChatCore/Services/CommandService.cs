@@ -49,7 +49,7 @@ namespace ChatCore.Services
             
             foreach (var conversation in conversations)
             {
-                var messages = await chatService.LoadConversationHistoryAsync(conversation.Id, 50);
+                var messages = await chatService.LoadConversationHistoryAsync(user, conversation.Id, 50);
                 var messageCount = messages.Count();
                 
                 if (messageCount > 0)
@@ -381,7 +381,7 @@ namespace ChatCore.Services
                 return;
             }
 
-            if (conversationService.AddUserToGroup(group, user, friend))
+            if (await conversationService.AddUserToGroupAsync(group, user, friend))
             {
                 await conversationRepository.UpdateAsync(group);
                 await SendSystemMessageAsync(user, $"{friend.Username} added to group {group.Name}.");
@@ -435,11 +435,17 @@ namespace ChatCore.Services
                 return;
             }
 
-            if (conversationService.RemoveUserFromGroup(group, user, member))
+            if (await conversationService.RemoveUserFromGroupAsync(group, user, member))
             {
                 await conversationRepository.UpdateAsync(group);
                 await SendSystemMessageAsync(user, $"{member.Username} removed from group {group.Name}.");
                 await SendGroupMembersAsync(user, group);
+                if (member.ActiveConversationId == group.Id)
+                {
+                    member.ActiveConversationId = null;
+                    await userRepository.UpdateAsync(member);
+                }
+                
                 if (member.IsOnline())
                 {
                     await SendSystemMessageAsync(member, $"You were removed from group {group.Name}.");

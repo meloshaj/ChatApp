@@ -149,6 +149,71 @@ namespace ChatCore.Repositories
             return (GroupConversation)await ReadConversationAsync(connection, reader);
         }
 
+        public async Task RecordUserJoinedAsync(string conversationId, string userId, DateTime timestamp)
+        {
+            await using var connection = database.CreateConnection();
+            await connection.OpenAsync();
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO membership_history (conversation_id, user_id, joined_at, left_at)
+                VALUES ($conversationId, $userId, $joinedAt, NULL);
+                """;
+            command.Parameters.AddWithValue("$conversationId", conversationId);
+            command.Parameters.AddWithValue("$userId", userId);
+            command.Parameters.AddWithValue("$joinedAt", timestamp.ToString("o"));
+            
+            await command.ExecuteNonQueryAsync();
+        }
+
+        public async Task RecordUserLeftAsync(string conversationId, string userId, DateTime timestamp)
+        {
+            await using var connection = database.CreateConnection();
+            await connection.OpenAsync();
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE membership_history
+                SET left_at = $leftAt
+                WHERE conversation_id = $conversationId 
+                  AND user_id = $userId 
+                  AND left_at IS NULL;
+                """;
+            command.Parameters.AddWithValue("$conversationId", conversationId);
+            command.Parameters.AddWithValue("$userId", userId);
+            command.Parameters.AddWithValue("$leftAt", timestamp.ToString("o"));
+
+            await command.ExecuteNonQueryAsync();
+        }
+
+        public async Task<IEnumerable<(DateTime JoinedAt, DateTime? LeftAt)>> GetMembershipHistoryAsync(string conversationId, string userId)
+        {
+            List<(DateTime JoinedAt, DateTime? LeftAt)> history = [];
+
+            await using var connection = database.CreateConnection();
+            await connection.OpenAsync();
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT joined_at, left_at
+                FROM membership_history
+                WHERE conversation_id = $conversationId AND user_id = $userId
+                ORDER BY joined_at ASC;
+                """;
+            command.Parameters.AddWithValue("$conversationId", conversationId);
+            command.Parameters.AddWithValue("$userId", userId);
+
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                DateTime joinedAt = DateTime.Parse(reader.GetString(0)).ToUniversalTime();
+                DateTime? leftAt = reader.IsDBNull(1) ? null : DateTime.Parse(reader.GetString(1)).ToUniversalTime();
+                history.Add((joinedAt, leftAt));
+            }
+
+            return history;
+        }
+
         private async Task UpsertAsync(Conversation entity, bool updateExisting)
         {
             await using var connection = database.CreateConnection();
