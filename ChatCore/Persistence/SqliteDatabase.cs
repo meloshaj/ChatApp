@@ -8,7 +8,11 @@ namespace ChatCore.Persistence
 
         public SqliteDatabase(string databasePath)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory);
+            var directory = Path.GetDirectoryName(databasePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
             connectionString = new SqliteConnectionStringBuilder
             {
                 DataSource = databasePath,

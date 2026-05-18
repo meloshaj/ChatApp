@@ -4,6 +4,7 @@ using ChatCore.Observers;
 using ChatCore.Factories;
 using ChatCore.Commands;
 using ChatCore.Security;
+using System.Collections.Concurrent;
 
 namespace ChatCore.Services
 {
@@ -16,7 +17,7 @@ namespace ChatCore.Services
         private readonly NotificationService notificationService;
         private readonly NetworkManager networkManager;
         private readonly List<IMessageProcessor> processors = new();
-        private readonly Dictionary<string, CommandHistory> userCommandHistories = new();
+        private readonly ConcurrentDictionary<string, CommandHistory> userCommandHistories = new();
 
         public ChatService(
             IMessageRepository messageRepository,
@@ -220,7 +221,7 @@ namespace ChatCore.Services
                     var participant = await userRepository.GetByIdAsync(participantId);
                     if (participant != null && participant.IsOnline())
                     {
-                        await SendTypingNotificationAsync(participant, notification);
+                        await SendTypingNotificationAsync(participant, notification, conversation);
                     }
                 }
             }
@@ -244,14 +245,13 @@ namespace ChatCore.Services
             }
         }
 
-        private async Task SendTypingNotificationAsync(User user, TypingNotification notification)
+        private async Task SendTypingNotificationAsync(User user, TypingNotification notification, Conversation conversation)
         {
             try
             {
                 var stream = user.GetStream();
                 if (stream == null) return;
 
-                var conversation = await conversationRepository.GetByIdAsync(notification.ConversationId);
                 string scope = conversation is GroupConversation ? "Group" : "Private";
                 string name = conversation is PrivateConversation privateConversation
                     ? await GetPrivateConversationLabelAsync(privateConversation, user)
@@ -432,11 +432,7 @@ namespace ChatCore.Services
 
         private CommandHistory GetCommandHistory(string userId)
         {
-            if (!userCommandHistories.ContainsKey(userId))
-            {
-                userCommandHistories[userId] = new CommandHistory();
-            }
-            return userCommandHistories[userId];
+            return userCommandHistories.GetOrAdd(userId, _ => new CommandHistory());
         }
     }
 }
